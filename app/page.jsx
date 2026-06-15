@@ -584,6 +584,64 @@ export default function Home() {
     });
   }
 
+  async function deleteReview(reviewId) {
+    if (effectiveRole !== "manager") return false;
+    const review = reviews.find((item) => item.id === reviewId);
+    if (!review) return false;
+
+    if (remoteMode && session?.access_token) {
+      setRemoteLoading(true);
+      setErrorNotice("");
+      try {
+        const response = await fetch("/api/admin/delete-review", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ reviewId }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || "Delete failed.");
+        await refreshRemoteData();
+        setActiveView("archive");
+        setNotice(`Deleted ${result.deletedName || review.clientName}.`);
+        return true;
+      } catch (error) {
+        setErrorNotice(error.message);
+        return false;
+      } finally {
+        setRemoteLoading(false);
+      }
+    }
+
+    const remainingReviews = reviews.filter((item) => item.id !== reviewId);
+    setReviews(remainingReviews);
+    setSelectedId(remainingReviews[0]?.id || "");
+    setShareLinks((current) => current.filter((link) => link.reviewId !== reviewId));
+    setActiveView("archive");
+    setNotice(`Deleted ${review.clientName}.`);
+    return true;
+  }
+
+  function requestDeleteReview(review) {
+    if (!review || effectiveRole !== "manager") return false;
+    const attachmentCount = (review.attachments || []).length;
+    const activeLinkCount = shareLinks.filter((link) => link.reviewId === review.id && isShareActive(link)).length;
+    const extra = [
+      attachmentCount ? `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}` : "",
+      activeLinkCount ? `${activeLinkCount} active share link${activeLinkCount === 1 ? "" : "s"}` : "",
+    ].filter(Boolean);
+    const suffix = extra.length ? ` This also removes ${extra.join(" and ")}.` : "";
+    setConfirmation({
+      title: "Delete review?",
+      message: `${review.clientName} will be permanently deleted.${suffix}`,
+      confirmLabel: "Delete Review",
+      tone: "danger",
+      onConfirm: () => deleteReview(review.id),
+    });
+  }
+
   async function createShareLink(review) {
     if (effectiveRole !== "manager") return false;
     if (remoteMode && supabaseClient && profile) {
@@ -997,6 +1055,7 @@ export default function Home() {
             links={shareLinks.filter((link) => link.reviewId === selectedReview?.id)}
             onCreateShare={createShareLink}
             onCreateReportShare={createReportShareLink}
+            onDelete={requestDeleteReview}
             onEdit={startEdit}
             onPrint={() => window.print()}
             onSetStatus={updateReviewStatus}
@@ -1220,7 +1279,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
   );
 }
 
-function ReviewDetail({ review, role, links, onCreateShare, onEdit, onPrint, onSetStatus = () => {} }) {
+function ReviewDetail({ review, role, links, onCreateShare, onDelete = () => {}, onEdit, onPrint, onSetStatus = () => {} }) {
   if (!review) {
     return (
       <section className="content-band unavailable">
@@ -1233,7 +1292,7 @@ function ReviewDetail({ review, role, links, onCreateShare, onEdit, onPrint, onS
 
   return (
     <div className="detail-layout">
-      <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions"><StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
+      <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions"><StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="secondary-button danger-button" onClick={() => onDelete(review)} type="button"><Trash2 size={16} />Delete</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
       <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><ConsumptionDetail consumption={review.consumption} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
       <section className="content-band two-column"><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><div className="people-list"><span>{isActionableFollowUp(review) ? "Needs follow-up" : "No follow-up needed"}</span><span>{hasCulinarySignal(review) ? "Culinary notes entered" : "No culinary note"}</span><span>{getConsumptionApplies(review.consumption) ? "Consumption applies" : "No consumption charge"}</span></div></div><AttachmentList attachments={review.attachments || []} /></section>
       <section className="content-band"><div className="section-heading"><h3>Shared Access</h3><span>{links.filter(isShareActive).length} active</span></div><div className="share-mini-list">{links.length === 0 && <p className="small-muted">No links created.</p>}{links.slice(0, 3).map((link) => <div className="share-mini" key={link.id}><span>{isShareActive(link) ? "Active" : "Inactive"}</span><em>Expires {formatDate(link.expiresAt.slice(0, 10))}</em></div>)}</div></section>

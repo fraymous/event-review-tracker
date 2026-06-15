@@ -236,6 +236,15 @@ button {
   padding: 0 12px;
 }
 
+.secondary-button.danger-button {
+  border-color: #fecdd3;
+  color: var(--rose);
+}
+
+.secondary-button.danger-button:hover {
+  background: #fff1f2;
+}
+
 .icon-button {
   background: var(--panel);
   border: 1px solid var(--line);
