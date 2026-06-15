@@ -1043,6 +1043,84 @@ button {
   resize: vertical;
 }
 
+.consumption-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.consumption-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+}
+
+.consumption-group legend {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 900;
+  padding: 0 6px;
+}
+
+.consumption-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.consumption-field {
+  display: grid;
+  gap: 6px;
+}
+
+.consumption-field span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.consumption-field input {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  min-height: 42px;
+  outline: 0;
+  padding: 10px 11px;
+  width: 100%;
+}
+
+.consumption-detail {
+  display: grid;
+  gap: 12px;
+}
+
+.consumption-detail-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.consumption-detail-group {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.consumption-detail-group strong {
+  font-size: 0.85rem;
+}
+
+.consumption-detail-group span {
+  color: #334155;
+  font-size: 0.9rem;
+}
+
 .upload-box {
   align-items: center;
   background: #f5f8fb;

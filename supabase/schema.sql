@@ -39,6 +39,7 @@ create table if not exists event_reviews (
   overall_rating integer check (overall_rating is null or overall_rating between 1 and 5),
   event_summary text,
   culinary_notes text,
+  consumption jsonb not null default '{}'::jsonb,
   operational_notes text,
   client_feedback text,
   wins text,
@@ -57,6 +58,7 @@ alter table event_reviews add column if not exists follow_up_owner text;
 alter table event_reviews add column if not exists follow_up_due_date date;
 alter table event_reviews add column if not exists client_contact text;
 alter table event_reviews add column if not exists follow_up_notes text;
+alter table event_reviews add column if not exists consumption jsonb not null default '{}'::jsonb;
 
 create table if not exists review_attachments (
   id uuid primary key default gen_random_uuid(),

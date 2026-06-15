@@ -9,7 +9,7 @@ A hosted-ready Next.js prototype for banquet and event review tracking.
 - Dashboard with recent events, follow-up queue, attachment count, culinary notes queue, event volume, and review signals
 - Executive Brief view for a printable 30-day leadership snapshot with attention items, culinary watchlist, and recent event notes
 - Searchable event archive with follow-up, manager, date-range filters, current-view summary, and full-note CSV export
-- Event detail view with client contact, food/culinary notes, operational notes, client feedback, wins, issues, follow-up notes, shared access, and attachments
+- Event detail view with client contact, food/culinary notes, consumption counts, operational notes, client feedback, wins, issues, follow-up notes, shared access, and attachments
 - Manager quick actions for marking whether a review needs follow-up from the detail view
 - Access directory for role-based manager and leadership visibility
 - Revocable single-review, executive-brief, and filtered-report share links with manager-selected expiration and a visible copy fallback
@@ -38,6 +38,8 @@ Open the local URL printed by Next.js.
 7. Add the deployed app URL to Supabase Auth redirect URLs so invited users return to the review tracker after accepting an invite.
 
 The current app runs with browser local storage when Supabase keys are missing. That makes the prototype easy to try immediately, but real multi-user leadership access needs Supabase connected.
+
+For existing Supabase projects, run new files in `supabase/migrations` from the SQL editor before deploying the matching app changes.
 
 Before Supabase is connected, use Sharing & Access > Data Backup to download a JSON safety copy of local reviews. Local demo share links only work in the same browser data store; use PDF or CSV exports for outside sharing until Vercel and Supabase are connected.
 

@@ -6,8 +6,9 @@ Use this when moving the review tracker from local demo mode to hosted V1.
 
 1. Create a Supabase project.
 2. Run `supabase/schema.sql` in the SQL editor.
-3. Confirm the private `review-attachments` bucket exists.
-4. In Supabase Auth, add the Vercel app URL to allowed redirect URLs.
+3. For existing projects, run any files in `supabase/migrations`.
+4. Confirm the private `review-attachments` bucket exists.
+5. In Supabase Auth, add the Vercel app URL to allowed redirect URLs.
 
 ## 2. Environment Variables
 
@@ -37,7 +38,7 @@ Keep `SUPABASE_SERVICE_ROLE_KEY` server-only.
 2. Confirm `storageMode` is `supabase`.
 3. Confirm `publicSharedLinks` and `managerInvites` are `true`.
 4. Confirm `firstManagerSignup` is `false` after the first manager profile exists.
-5. Create one review with culinary notes and follow-up notes.
+5. Create one review with culinary notes, consumption counts, and follow-up notes.
 6. Confirm the dashboard and archive call out reviews that need follow-up.
 7. Upload one attachment.
 8. Create an executive brief share link and open it in a private browser.

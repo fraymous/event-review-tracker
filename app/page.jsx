@@ -40,9 +40,12 @@ import { eventTypes, seedReviews } from "../lib/seed-data";
 import {
   applyReviewFilters,
   buildCsv,
+  consumptionGroups,
+  emptyConsumption,
   formatDate,
   formatDateTime,
   formatFileSize,
+  formatConsumptionSummary,
   getReviewDueState,
   getShareUrl,
   getSupabaseStatus,
@@ -50,6 +53,7 @@ import {
   loadReviews,
   loadShareLinks,
   makeId,
+  normalizeConsumption,
   saveReviews,
   saveShareLinks,
 } from "../lib/review-store";
@@ -98,6 +102,7 @@ function blankReview(managerName = "Michael Frazier") {
     overallRating: "",
     summary: "",
     culinaryNotes: "",
+    consumption: emptyConsumption(),
     operationalNotes: "",
     clientFeedback: "",
     wins: "",
@@ -128,6 +133,7 @@ function normalizeReview(form, existing) {
       ? form.staffInvolved
       : String(form.staffInvolved || "").split(",").map((item) => item.trim()).filter(Boolean),
     overallRating: form.overallRating === "" ? null : Number(form.overallRating),
+    consumption: normalizeConsumption(form.consumption),
     tags: Array.isArray(form.tags) ? form.tags : [],
     followUpStatus: form.followUpStatus === "Needs follow-up" ? "Needs follow-up" : "Draft",
     followUpOwner: "",
@@ -541,13 +547,14 @@ export default function Home() {
         const retainedIds = new Set((form.attachments || []).filter((attachment) => !attachment.file).map((attachment) => attachment.id));
         const removedAttachments = existing ? existing.attachments.filter((attachment) => !retainedIds.has(attachment.id)) : [];
         const saved = await upsertRemoteReview(supabaseClient, normalized, profile);
+        const consumptionPendingMigration = Boolean(saved.__consumptionPendingMigration);
         await deleteRemoteAttachments(supabaseClient, removedAttachments);
         await uploadRemoteAttachments(supabaseClient, saved.id, pendingAttachments, profile);
         await refreshRemoteData({ selectId: saved.id });
         setEditingReview(null);
         setFormDirty(false);
         setActiveView("detail");
-        setNotice(existing ? "Review updated." : "Review created.");
+        setNotice(consumptionPendingMigration ? "Review saved. Run the Supabase consumption migration to persist consumption counts." : existing ? "Review updated." : "Review created.");
       } catch (error) {
         setErrorNotice(error.message);
       } finally {
@@ -1226,8 +1233,8 @@ function ReviewDetail({ review, role, links, onCreateShare, onEdit, onPrint, onS
   return (
     <div className="detail-layout">
       <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions"><StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
-      <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
-      <section className="content-band two-column"><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><div className="people-list"><span>{isActionableFollowUp(review) ? "Needs follow-up" : "No follow-up needed"}</span><span>{hasCulinarySignal(review) ? "Culinary notes entered" : "No culinary note"}</span></div></div><AttachmentList attachments={review.attachments || []} /></section>
+      <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><ConsumptionDetail consumption={review.consumption} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
+      <section className="content-band two-column"><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><div className="people-list"><span>{isActionableFollowUp(review) ? "Needs follow-up" : "No follow-up needed"}</span><span>{hasCulinarySignal(review) ? "Culinary notes entered" : "No culinary note"}</span><span>{formatConsumptionSummary(review.consumption) ? "Consumption entered" : "No consumption entry"}</span></div></div><AttachmentList attachments={review.attachments || []} /></section>
       <section className="content-band"><div className="section-heading"><h3>Shared Access</h3><span>{links.filter(isShareActive).length} active</span></div><div className="share-mini-list">{links.length === 0 && <p className="small-muted">No links created.</p>}{links.slice(0, 3).map((link) => <div className="share-mini" key={link.id}><span>{isShareActive(link) ? "Active" : "Inactive"}</span><em>Expires {formatDate(link.expiresAt.slice(0, 10))}</em></div>)}</div></section>
       {role === "manager" && <div className="sticky-actions status-actions">{review.followUpStatus !== "Needs follow-up" ? <button className="secondary-button" onClick={() => onEdit({ ...review, followUpStatus: "Needs follow-up" })} type="button"><AlertTriangle size={16} />Add Follow-up</button> : <button className="secondary-button" onClick={() => onSetStatus(review.id, "Draft")} type="button"><CheckCircle2 size={16} />No Follow-up</button>}</div>}
     </div>
@@ -1235,7 +1242,7 @@ function ReviewDetail({ review, role, links, onCreateShare, onEdit, onPrint, onS
 }
 
 function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave }) {
-  const [form, setForm] = useState(() => ({ ...blankReview(), ...review }));
+  const [form, setForm] = useState(() => ({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) }));
 
   useEffect(() => {
     onDirtyChange(false);
@@ -1249,6 +1256,17 @@ function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave }) {
   function update(key, value) {
     markDirty();
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateConsumption(key, value) {
+    markDirty();
+    setForm((current) => ({
+      ...current,
+      consumption: {
+        ...normalizeConsumption(current.consumption),
+        [key]: value,
+      },
+    }));
   }
 
   function setNeedsFollowUp(value) {
@@ -1275,9 +1293,42 @@ function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave }) {
     <form className="review-form" onSubmit={submit}>
       <section className="form-section"><div className="section-heading"><h3>Event</h3><span>{form.id ? "Edit" : "New"}</span></div><div className="form-grid"><TextInput label="Date" onChange={(value) => update("eventDate", value)} required type="date" value={form.eventDate} /><TextInput label="Event / Client" onChange={(value) => update("clientName", value)} required value={form.clientName} /><TextInput label="Client Contact" onChange={(value) => update("clientContact", value)} value={form.clientContact || ""} /><TextInput label="Venue / Location" onChange={(value) => update("venue", value)} required value={form.venue} /><SelectInput label="Event Type" onChange={(value) => update("eventType", value)} options={eventTypes} value={form.eventType} /><TextInput label="Manager" onChange={(value) => update("managerName", value)} required value={form.managerName} /></div></section>
       <section className="form-section"><div className="section-heading"><h3>Review</h3><span>Rating required</span></div><div className="form-grid"><SelectInput label="Overall Rating" onChange={(value) => update("overallRating", value)} options={["", "1", "2", "3", "4", "5"]} renderOption={(value) => (value ? `${value}/5` : "Select rating")} required value={String(form.overallRating ?? "")} /><SelectInput label="Needs Follow-up" onChange={setNeedsFollowUp} options={["No", "Yes"]} value={needsFollowUp ? "Yes" : "No"} /></div>{needsFollowUp && <TextArea label="Follow-up Notes" onChange={(value) => update("followUpNotes", value)} required value={form.followUpNotes || ""} />}<TextArea label="Event Summary" onChange={(value) => update("summary", value)} value={form.summary} /><TextArea label="Food / Culinary Notes" onChange={(value) => update("culinaryNotes", value)} value={form.culinaryNotes} /><TextArea label="Operational Notes" onChange={(value) => update("operationalNotes", value)} value={form.operationalNotes} /><TextArea label="Client Feedback" onChange={(value) => update("clientFeedback", value)} value={form.clientFeedback} /><div className="form-grid"><TextArea label="Wins" onChange={(value) => update("wins", value)} value={form.wins} /><TextArea label="Issues" onChange={(value) => update("issues", value)} value={form.issues} /></div></section>
+      <ConsumptionInputs consumption={form.consumption} onChange={updateConsumption} />
       <section className="form-section"><div className="section-heading"><h3>Files</h3><span>{form.attachments.length} attachments</span></div><label className="upload-box"><Upload size={20} /><span>Attach PDFs or photos</span><input accept=".pdf,image/*" multiple onChange={(event) => addAttachments(event.target.files)} type="file" /></label><div className="attachment-editor">{form.attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}<span>{attachment.name}</span><em>{formatFileSize(attachment.size)}{attachment.isPendingUpload ? " pending" : ""}</em><button type="button" onClick={() => removeAttachment(attachment.id)} title="Remove"><X size={16} /></button></div>)}</div></section>
       <div className="form-actions"><button className="secondary-button" onClick={onCancel} type="button"><X size={16} />Cancel</button><button className="primary-button" type="submit"><Save size={16} />Save Review</button></div>
     </form>
+  );
+}
+
+function ConsumptionInputs({ consumption, onChange }) {
+  const normalized = normalizeConsumption(consumption);
+
+  return (
+    <section className="form-section">
+      <div className="section-heading"><h3>Consumption</h3><span>Amounts</span></div>
+      <div className="consumption-editor">
+        {consumptionGroups.map((group) => (
+          <fieldset className="consumption-group" key={group.title}>
+            <legend>{group.title}</legend>
+            <div className="consumption-grid">
+              {group.items.map((item) => (
+                <label className="consumption-field" key={item.key}>
+                  <span>{item.label}</span>
+                  <input
+                    inputMode="numeric"
+                    min="0"
+                    onChange={(event) => onChange(item.key, event.target.value)}
+                    step="1"
+                    type="number"
+                    value={normalized[item.key]}
+                  />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1451,6 +1502,34 @@ function MobileReviewList({ onCreateShare = () => {}, onEdit = () => {}, onSelec
 
 function DetailBlock({ icon, title, value, tone }) {
   return <article className={`detail-block ${tone || ""}`}><div className="detail-block-title">{icon}<h4>{title}</h4></div><p>{value || "N/A"}</p></article>;
+}
+
+function ConsumptionDetail({ consumption }) {
+  const normalized = normalizeConsumption(consumption);
+  const populatedGroups = consumptionGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => normalized[item.key] !== ""),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  return (
+    <article className="detail-block consumption-detail">
+      <div className="detail-block-title"><Utensils size={18} /><h4>Consumption</h4></div>
+      {populatedGroups.length === 0 ? (
+        <p>N/A</p>
+      ) : (
+        <div className="consumption-detail-grid">
+          {populatedGroups.map((group) => (
+            <div className="consumption-detail-group" key={group.title}>
+              <strong>{group.title}</strong>
+              {group.items.map((item) => <span key={item.key}>{item.label}: {normalized[item.key]}</span>)}
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
+  );
 }
 
 function AttachmentList({ attachments }) {
