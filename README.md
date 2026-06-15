@@ -78,7 +78,7 @@ For v1, managers can invite leadership users through the invite route once `SUPA
 
 ## Deployment readiness check
 
-After deploying or running locally, visit `/api/health`. It returns whether the app is running in local-demo mode or Supabase-backed mode, whether first-manager sign-up is currently available, and whether public shared links and manager invites are ready.
+After deploying or running locally, visit `/api/health`. It returns whether the app is running in local-demo mode or Supabase-backed mode, whether first-manager sign-up is currently available, whether public shared links and manager invites are ready, and whether consumption storage is migrated.
 
 ## Manager invites
 

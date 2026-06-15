@@ -17,6 +17,20 @@ async function getProfilePresence(canCheckProfiles) {
   return Number(count || 0) > 0;
 }
 
+async function getConsumptionStoragePresence(canCheckStorage) {
+  if (!canCheckStorage) return null;
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return null;
+
+  const { error } = await supabase
+    .from("event_reviews")
+    .select("consumption", { head: true })
+    .limit(1);
+
+  return !error;
+}
+
 export async function GET() {
   const allowPublicSignUp = process.env.NEXT_PUBLIC_ALLOW_SIGN_UP !== "false";
   const checks = {
@@ -29,6 +43,7 @@ export async function GET() {
   const supabaseReady = checks.supabaseUrl && checks.supabaseAnonKey;
   const sharedLinksReady = supabaseReady && checks.supabaseServiceRoleKey;
   const hasProfiles = await getProfilePresence(sharedLinksReady);
+  const consumptionStorage = await getConsumptionStoragePresence(sharedLinksReady);
   const firstManagerSignup = allowPublicSignUp && hasProfiles !== true;
 
   return NextResponse.json({
@@ -37,12 +52,14 @@ export async function GET() {
     checks: {
       ...checks,
       hasProfiles,
+      consumptionStorage,
     },
     features: {
       authAndDatabase: supabaseReady,
       firstManagerSignup,
       publicSharedLinks: sharedLinksReady,
       managerInvites: sharedLinksReady,
+      consumptionStorage: consumptionStorage !== false,
     },
   });
 }

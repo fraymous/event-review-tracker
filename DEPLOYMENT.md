@@ -37,11 +37,12 @@ Keep `SUPABASE_SERVICE_ROLE_KEY` server-only.
 1. Visit `/api/health`.
 2. Confirm `storageMode` is `supabase`.
 3. Confirm `publicSharedLinks` and `managerInvites` are `true`.
-4. Confirm `firstManagerSignup` is `false` after the first manager profile exists.
-5. Create one review with culinary notes, optional consumption counts, and follow-up notes.
-6. Confirm the dashboard and archive call out reviews that need follow-up.
-7. Upload one attachment.
-8. Create an executive brief share link and open it in a private browser.
-9. Create a single-review share link and open it in a private browser.
-10. Create a filtered report link with a date range and open it in a private browser.
-11. Sign in as a leadership user and confirm read-only access.
+4. Confirm `consumptionStorage` is `true` after running the consumption migration.
+5. Confirm `firstManagerSignup` is `false` after the first manager profile exists.
+6. Create one review with culinary notes, optional consumption counts, and follow-up notes.
+7. Confirm the dashboard and archive call out reviews that need follow-up.
+8. Upload one attachment.
+9. Create an executive brief share link and open it in a private browser.
+10. Create a single-review share link and open it in a private browser.
+11. Create a filtered report link with a date range and open it in a private browser.
+12. Sign in as a leadership user and confirm read-only access.
