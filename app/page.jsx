@@ -1550,14 +1550,24 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
 
 
 function AccessDirectory({ users }) {
+  const sortedUsers = [...users].sort((a, b) => {
+    const rolePriority = { manager: 0, leadership: 1 };
+    const roleDifference = (rolePriority[a.role] ?? 2) - (rolePriority[b.role] ?? 2);
+    if (roleDifference !== 0) return roleDifference;
+    return String(a.fullName || a.email || "").localeCompare(String(b.fullName || b.email || ""));
+  });
+  const managerCount = users.filter((user) => user.role === "manager").length;
+  const leadershipCount = users.filter((user) => user.role === "leadership").length;
+  const countLabel = `${managerCount} manager${managerCount === 1 ? "" : "s"} | ${leadershipCount} viewer${leadershipCount === 1 ? "" : "s"}`;
+
   return (
     <section className="content-band">
-      <div className="section-heading"><h3>Access Directory</h3><span>{users.length} role users</span></div>
+      <div className="section-heading"><h3>Access Directory</h3><span>{countLabel}</span></div>
       <div className="access-directory">
         {users.length === 0 && <EmptyState title="No role users yet" />}
-        {users.map((user) => (
+        {sortedUsers.map((user) => (
           <div className="access-user" key={user.id}>
-            <div><strong>{user.fullName || user.email || "Unnamed user"}</strong><span>{user.email || "Profile email pending"}</span></div>
+            <div><strong>{user.fullName || user.email || "Unnamed user"}</strong><span>{user.email || "Profile email pending"}{user.createdAt ? ` | Added ${formatDate(user.createdAt.slice(0, 10))}` : ""}</span></div>
             <span className={`role-pill ${user.role}`}>{roleCopy[user.role]?.label || user.role}</span>
           </div>
         ))}
