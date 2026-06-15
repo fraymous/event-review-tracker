@@ -12,6 +12,7 @@ import {
   Copy,
   Download,
   Eye,
+  ExternalLink,
   FileText,
   Filter,
   Image as ImageIcon,
@@ -626,6 +627,12 @@ export default function Home() {
     setNotice(message);
   }
 
+  function openShareUrl(token) {
+    const url = getShareUrl(token);
+    setLastShareUrl(url);
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
 
   async function inviteUser(payload) {
     if (!remoteMode || !session?.access_token) {
@@ -926,6 +933,7 @@ export default function Home() {
             onExportBackup={exportBackup}
             onImportBackup={importBackupFile}
             onInvite={inviteUser}
+            onOpen={openShareUrl}
             onReset={requestResetDemoData}
             onRevoke={requestRevokeShareLink}
             onShareExpiryDays={setShareExpiryDays}
@@ -1120,7 +1128,7 @@ function ReviewDetail({ review, role, links, onCreateShare, onEdit, onPrint, onS
       <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
       <section className="content-band two-column"><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><div className="people-list"><span>{isActionableFollowUp(review) ? "Needs follow-up" : "No follow-up needed"}</span><span>{hasCulinarySignal(review) ? "Culinary notes entered" : "No culinary note"}</span></div></div><AttachmentList attachments={review.attachments || []} /></section>
       <section className="content-band"><div className="section-heading"><h3>Shared Access</h3><span>{links.filter(isShareActive).length} active</span></div><div className="share-mini-list">{links.length === 0 && <p className="small-muted">No links created.</p>}{links.slice(0, 3).map((link) => <div className="share-mini" key={link.id}><span>{isShareActive(link) ? "Active" : "Inactive"}</span><em>Expires {formatDate(link.expiresAt.slice(0, 10))}</em></div>)}</div></section>
-      {role === "manager" && <div className="sticky-actions status-actions">{review.followUpStatus !== "Needs follow-up" ? <button className="secondary-button" onClick={() => onSetStatus(review.id, "Needs follow-up")} type="button"><AlertTriangle size={16} />Needs Follow-up</button> : <button className="secondary-button" onClick={() => onSetStatus(review.id, "Draft")} type="button"><CheckCircle2 size={16} />No Follow-up</button>}</div>}
+      {role === "manager" && <div className="sticky-actions status-actions">{review.followUpStatus !== "Needs follow-up" ? <button className="secondary-button" onClick={() => onEdit({ ...review, followUpStatus: "Needs follow-up" })} type="button"><AlertTriangle size={16} />Add Follow-up</button> : <button className="secondary-button" onClick={() => onSetStatus(review.id, "Draft")} type="button"><CheckCircle2 size={16} />No Follow-up</button>}</div>}
     </div>
   );
 }
@@ -1152,7 +1160,7 @@ function ReviewForm({ review, onCancel, onSave }) {
   );
 }
 
-function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, role, remoteMode, onCopy, onCreateBriefShare, onCreateShare, onCreateReportShare, onExportBackup, onImportBackup, onInvite, onReset, onRevoke, onShareExpiryDays, shareExpiryDays, supabaseStatus }) {
+function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, role, remoteMode, onCopy, onCreateBriefShare, onCreateShare, onCreateReportShare, onExportBackup, onImportBackup, onInvite, onOpen, onReset, onRevoke, onShareExpiryDays, shareExpiryDays, supabaseStatus }) {
   const activeLinks = links.filter(isShareActive);
   const invitesReady = Boolean(healthStatus?.features?.managerInvites);
   const inviteMetric = remoteMode ? (invitesReady ? "Ready" : "Setup") : "Local";
@@ -1162,7 +1170,7 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
   return (
     <div className="view-grid">
       <section className="metric-grid"><MetricCard icon={<ShieldCheck />} label="Active links" value={activeLinks.length} /><MetricCard icon={<Eye />} label="Role access" value="Read-only" /><MetricCard icon={<Mail />} label="Manager invites" value={inviteMetric} /><MetricCard icon={<Lock />} label="Storage" value={remoteMode || supabaseStatus.configured ? "Cloud" : "Local"} /></section>
-      <section className="content-band"><div className="section-heading"><h3>Review Links</h3><span>Custom expiration</span></div><div className="share-list">{links.length === 0 && <EmptyState title="No share links yet" />}{links.map((link) => { const review = reviews.find((item) => item.id === link.reviewId); const isReport = link.scope === "filtered-report"; const isBrief = link.scope === "executive-brief"; const name = isBrief ? "Executive Brief" : isReport ? "Filtered Report" : review?.clientName || "Unknown review"; const description = isBrief ? "30-day leadership snapshot" : isReport ? formatReportFilters(link.filters) : "Single review public link"; const scopeClass = isBrief ? "brief" : isReport ? "report" : "review"; const scopeLabel = isBrief ? "Brief" : isReport ? "Report" : "Review"; return <div className="share-row" key={link.id}><div><strong>{name}</strong><span>{isShareActive(link) ? "Active" : "Inactive"} - Expires {formatDate(link.expiresAt.slice(0, 10))}</span><em>{description}</em></div><span className={`share-scope ${scopeClass}`}>{scopeLabel}</span><div className="row-actions"><button className="icon-button" onClick={() => onCopy(link.token)} title="Copy" type="button"><Copy size={16} /></button>{role === "manager" && !link.revokedAt && <button className="icon-button" onClick={() => onRevoke(link.id)} title="Revoke" type="button"><Trash2 size={16} /></button>}</div></div>; })}</div></section>
+      <section className="content-band"><div className="section-heading"><h3>Review Links</h3><span>Custom expiration</span></div><div className="share-list">{links.length === 0 && <EmptyState title="No share links yet" />}{links.map((link) => { const review = reviews.find((item) => item.id === link.reviewId); const isReport = link.scope === "filtered-report"; const isBrief = link.scope === "executive-brief"; const name = isBrief ? "Executive Brief" : isReport ? "Filtered Report" : review?.clientName || "Unknown review"; const description = isBrief ? "30-day leadership snapshot" : isReport ? formatReportFilters(link.filters) : "Single review public link"; const scopeClass = isBrief ? "brief" : isReport ? "report" : "review"; const scopeLabel = isBrief ? "Brief" : isReport ? "Report" : "Review"; return <div className="share-row" key={link.id}><div><strong>{name}</strong><span>{isShareActive(link) ? "Active" : "Inactive"} - Expires {formatDate(link.expiresAt.slice(0, 10))}</span><em>{description}</em></div><span className={`share-scope ${scopeClass}`}>{scopeLabel}</span><div className="row-actions"><button className="icon-button" onClick={() => onOpen(link.token)} title="Open" type="button"><ExternalLink size={16} /></button><button className="icon-button" onClick={() => onCopy(link.token)} title="Copy" type="button"><Copy size={16} /></button>{role === "manager" && !link.revokedAt && <button className="icon-button" onClick={() => onRevoke(link.id)} title="Revoke" type="button"><Trash2 size={16} /></button>}</div></div>; })}</div></section>
       {lastShareUrl && <section className="content-band"><div className="section-heading"><h3>Last Share URL</h3><span>Copy fallback</span></div><label className="share-url-box"><LinkIcon size={16} /><input onFocus={(event) => event.target.select()} readOnly value={lastShareUrl} /></label></section>}
       {role === "manager" && <section className="content-band"><div className="section-heading"><h3>Create Link</h3><span>Expires in {shareExpiryDays} days</span></div><div className="share-controls"><SelectInput label="Link Expires" onChange={(value) => onShareExpiryDays(normalizeShareExpiryDays(value))} options={shareExpiryOptions.map(String)} renderOption={(value) => `${value} days`} value={String(shareExpiryDays)} /></div><div className="quick-share-grid"><button className="quick-share" onClick={onCreateBriefShare} type="button"><span>Executive Brief</span><FileText size={16} /></button><button className="quick-share" onClick={onCreateReportShare} type="button"><span>All Reviews Report</span><Share2 size={16} /></button>{reviews.slice(0, 6).map((review) => <button className="quick-share" key={review.id} onClick={() => onCreateShare(review)} type="button"><span>{review.clientName}</span><LinkIcon size={16} /></button>)}</div></section>}
       <section className="content-band">
