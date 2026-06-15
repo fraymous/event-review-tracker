@@ -544,10 +544,11 @@ export default function Home() {
       setErrorNotice("");
       try {
         const normalized = normalizeReview(form, existing);
+        const remoteReview = existing ? normalized : { ...normalized, id: "" };
         const pendingAttachments = (form.attachments || []).filter((attachment) => attachment.file);
         const retainedIds = new Set((form.attachments || []).filter((attachment) => !attachment.file).map((attachment) => attachment.id));
         const removedAttachments = existing ? existing.attachments.filter((attachment) => !retainedIds.has(attachment.id)) : [];
-        const saved = await upsertRemoteReview(supabaseClient, normalized, profile);
+        const saved = await upsertRemoteReview(supabaseClient, remoteReview, profile);
         const consumptionPendingMigration = Boolean(saved.__consumptionPendingMigration);
         await deleteRemoteAttachments(supabaseClient, removedAttachments);
         await uploadRemoteAttachments(supabaseClient, saved.id, pendingAttachments, profile);
