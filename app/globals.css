@@ -1199,6 +1199,13 @@ button {
   max-width: 220px;
 }
 
+.share-link-builder {
+  align-items: end;
+  gap: 12px;
+  grid-template-columns: minmax(140px, 180px) minmax(260px, 1fr) auto;
+  max-width: none;
+}
+
 .backup-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1324,6 +1331,7 @@ button {
   .brief-note-grid,
   .detail-grid,
   .form-grid,
+  .share-link-builder,
   .quick-share-grid {
     grid-template-columns: 1fr;
   }

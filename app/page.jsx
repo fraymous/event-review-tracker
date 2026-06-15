@@ -1472,9 +1472,12 @@ function ConsumptionInputs({ consumption, onAppliesChange, onChange }) {
 }
 
 function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, role, remoteMode, onCopy, onCreateBriefShare, onCreateShare, onCreateReportShare, onExportBackup, onImportBackup, onInvite, onOpen, onReset, onRevoke, onShareExpiryDays, shareExpiryDays, supabaseStatus }) {
+  const shareableReviews = useMemo(() => [...reviews].sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)), [reviews]);
+  const [selectedShareReviewId, setSelectedShareReviewId] = useState(shareableReviews[0]?.id || "");
   const sortedLinks = [...links].sort(sortShareLinks);
   const activeLinks = sortedLinks.filter(isShareActive);
   const inactiveLinks = sortedLinks.filter((link) => !isShareActive(link));
+  const selectedShareReview = shareableReviews.find((review) => review.id === selectedShareReviewId);
   const invitesReady = Boolean(healthStatus?.features?.managerInvites);
   const consumptionStorageReady = Boolean(healthStatus?.features?.consumptionStorage);
   const inviteMetric = remoteMode ? (invitesReady ? "Ready" : "Setup") : "Local";
@@ -1482,6 +1485,18 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
   const sharingNote = remoteMode
     ? "Managers create and edit. Executives and directors view all reviews in read-only mode. Shared links expose one review, the executive brief, or a filtered report and can be revoked."
     : "Local mode is ready for personal tracking. Use PDF or CSV for outside sharing until Supabase and Vercel are connected.";
+
+  useEffect(() => {
+    if (shareableReviews.length === 0) {
+      if (selectedShareReviewId) setSelectedShareReviewId("");
+      return;
+    }
+
+    if (!shareableReviews.some((review) => review.id === selectedShareReviewId)) {
+      setSelectedShareReviewId(shareableReviews[0].id);
+    }
+  }, [selectedShareReviewId, shareableReviews]);
+
   function renderShareRow(link) {
     const review = reviews.find((item) => item.id === link.reviewId);
     const isReport = link.scope === "filtered-report";
@@ -1518,7 +1533,7 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
         </div>
       </section>
       {lastShareUrl && <section className="content-band"><div className="section-heading"><h3>Last Share URL</h3><span>Copy fallback</span></div><label className="share-url-box"><LinkIcon size={16} /><input onFocus={(event) => event.target.select()} readOnly value={lastShareUrl} /></label></section>}
-      {role === "manager" && <section className="content-band"><div className="section-heading"><h3>Create Link</h3><span>Expires in {shareExpiryDays} days</span></div><div className="share-controls"><SelectInput label="Link Expires" onChange={(value) => onShareExpiryDays(normalizeShareExpiryDays(value))} options={shareExpiryOptions.map(String)} renderOption={(value) => `${value} days`} value={String(shareExpiryDays)} /></div><div className="quick-share-grid"><button className="quick-share" onClick={onCreateBriefShare} type="button"><span>Executive Brief</span><FileText size={16} /></button><button className="quick-share" onClick={onCreateReportShare} type="button"><span>All Reviews Report</span><Share2 size={16} /></button>{reviews.slice(0, 6).map((review) => <button className="quick-share" key={review.id} onClick={() => onCreateShare(review)} type="button"><span>{review.clientName}</span><LinkIcon size={16} /></button>)}</div></section>}
+      {role === "manager" && <section className="content-band"><div className="section-heading"><h3>Create Link</h3><span>Expires in {shareExpiryDays} days</span></div><div className="share-controls share-link-builder"><SelectInput label="Link Expires" onChange={(value) => onShareExpiryDays(normalizeShareExpiryDays(value))} options={shareExpiryOptions.map(String)} renderOption={(value) => `${value} days`} value={String(shareExpiryDays)} /><SelectInput disabled={shareableReviews.length === 0} label="Single Review" onChange={setSelectedShareReviewId} options={shareableReviews.map((review) => review.id)} renderOption={(value) => { const review = shareableReviews.find((item) => item.id === value); return review ? `${formatDate(review.eventDate)} - ${review.clientName}` : "No reviews"; }} value={selectedShareReviewId} /><button className="primary-button" disabled={!selectedShareReview} onClick={() => selectedShareReview && onCreateShare(selectedShareReview)} type="button"><LinkIcon size={16} />Single Review</button></div><div className="quick-share-grid"><button className="quick-share" onClick={onCreateBriefShare} type="button"><span>Executive Brief</span><FileText size={16} /></button><button className="quick-share" onClick={onCreateReportShare} type="button"><span>All Reviews Report</span><Share2 size={16} /></button></div></section>}
       <section className="content-band">
         <div className="section-heading"><h3>Data Backup</h3><span>{remoteMode ? "Cloud copy" : "Local safety copy"}</span></div>
         <div className="backup-actions">
