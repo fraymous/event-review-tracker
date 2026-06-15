@@ -30,6 +30,7 @@ create table if not exists event_reviews (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
   event_name text not null,
+  client_contact text,
   event_date date not null,
   venue text not null,
   event_type text not null,
@@ -46,6 +47,7 @@ create table if not exists event_reviews (
   follow_up_status review_status not null default 'Draft',
   follow_up_owner text,
   follow_up_due_date date,
+  follow_up_notes text,
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -53,6 +55,8 @@ create table if not exists event_reviews (
 
 alter table event_reviews add column if not exists follow_up_owner text;
 alter table event_reviews add column if not exists follow_up_due_date date;
+alter table event_reviews add column if not exists client_contact text;
+alter table event_reviews add column if not exists follow_up_notes text;
 
 create table if not exists review_attachments (
   id uuid primary key default gen_random_uuid(),

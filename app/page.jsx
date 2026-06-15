@@ -35,7 +35,7 @@ import {
   X,
 } from "lucide-react";
 
-import { eventTypes, seedReviews, statusOptions, tagOptions } from "../lib/seed-data";
+import { eventTypes, seedReviews, statusOptions } from "../lib/seed-data";
 import {
   applyReviewFilters,
   buildCsv,
@@ -80,7 +80,6 @@ const demoAccessUsers = [
 ];
 
 const initialFilters = { query: "", status: "All", tag: "All", manager: "All", due: "All", dateFrom: "", dateTo: "" };
-const dueFilterOptions = ["All", "Overdue", "Due today", "Upcoming", "No due date"];
 const shareExpiryOptions = [7, 14, 30, 60, 90];
 const backupType = "event-review-tracker-backup";
 
@@ -88,6 +87,7 @@ function blankReview(managerName = "Michael Frazier") {
   return {
     id: "",
     clientName: "",
+    clientContact: "",
     eventDate: new Date().toISOString().slice(0, 10),
     venue: "",
     eventType: "Corporate",
@@ -104,6 +104,7 @@ function blankReview(managerName = "Michael Frazier") {
     followUpStatus: "Draft",
     followUpOwner: "",
     followUpDueDate: "",
+    followUpNotes: "",
     attachments: [],
     createdAt: "",
     updatedAt: "",
@@ -120,13 +121,16 @@ function normalizeReview(form, existing) {
   return {
     ...form,
     id: existing?.id || form.id || makeId("rev"),
+    clientContact: String(form.clientContact || "").trim(),
     staffInvolved: Array.isArray(form.staffInvolved)
       ? form.staffInvolved
       : String(form.staffInvolved || "").split(",").map((item) => item.trim()).filter(Boolean),
     overallRating: form.overallRating === "" ? null : Number(form.overallRating),
     tags: Array.isArray(form.tags) ? form.tags : [],
-    followUpOwner: String(form.followUpOwner || "").trim(),
-    followUpDueDate: form.followUpDueDate || "",
+    followUpStatus: form.followUpStatus === "Needs follow-up" ? "Needs follow-up" : "Draft",
+    followUpOwner: "",
+    followUpDueDate: "",
+    followUpNotes: form.followUpStatus === "Needs follow-up" ? String(form.followUpNotes || "").trim() : "",
     attachments: Array.isArray(form.attachments) ? form.attachments.map(stripAttachmentForStorage) : [],
     createdAt: existing?.createdAt || now,
     updatedAt: now,
@@ -151,10 +155,7 @@ function previewText(value, maxLength = 92) {
 }
 
 function followUpMeta(review) {
-  const parts = [];
-  if (review?.followUpOwner) parts.push(`Owner: ${review.followUpOwner}`);
-  if (review?.followUpDueDate) parts.push(`Due ${formatDate(review.followUpDueDate)}`);
-  return parts.length ? parts.join(" | ") : "No owner or due date";
+  return previewText(review?.followUpNotes, 80);
 }
 
 function localDateKey(date = new Date()) {
@@ -166,29 +167,16 @@ function isActionableFollowUp(review) {
   return review?.followUpStatus === "Needs follow-up";
 }
 
+function hasCulinarySignal(review) {
+  return String(review?.culinaryNotes || "").trim() || (review?.tags || []).includes("culinary");
+}
+
 function getFollowUpDueState(review) {
   return getReviewDueState(review);
 }
 
-function followUpDueLabel(review) {
-  const labels = {
-    inactive: "Not active",
-    overdue: "Overdue",
-    today: "Due today",
-    upcoming: "Upcoming",
-    unscheduled: "No due date",
-  };
-  return labels[getFollowUpDueState(review)] || "No due date";
-}
-
-function followUpDueSummary(review) {
-  const dueDate = review?.followUpDueDate ? formatDate(review.followUpDueDate) : "No due date";
-  return isActionableFollowUp(review) ? `${dueDate} | ${followUpDueLabel(review)}` : dueDate;
-}
-
 function followUpQueueText(review) {
-  const note = previewText(review?.issues || review?.operationalNotes, 70);
-  return `${followUpMeta(review)} - ${note}`;
+  return previewText(review?.followUpNotes || review?.issues || review?.operationalNotes, 90);
 }
 
 function sortFollowUps(a, b) {
@@ -484,22 +472,10 @@ export default function Home() {
     if (effectiveRole !== "manager") return false;
     const review = reviews.find((item) => item.id === reviewId);
     if (!review) return;
-    await saveReview({ ...review, followUpStatus });
-  }
-
-  async function archiveReview(reviewId) {
-    await updateReviewStatus(reviewId, "Closed");
-  }
-
-  function requestArchiveReview(reviewId) {
-    const review = reviews.find((item) => item.id === reviewId);
-    if (!review) return;
-    setConfirmation({
-      title: "Mark review closed?",
-      message: `${review.clientName} will leave the open follow-up workflow but remain available in the archive.`,
-      confirmLabel: "Mark Closed",
-      tone: "warning",
-      onConfirm: () => archiveReview(reviewId),
+    await saveReview({
+      ...review,
+      followUpStatus,
+      followUpNotes: followUpStatus === "Needs follow-up" ? review.followUpNotes : "",
     });
   }
 
@@ -882,7 +858,6 @@ export default function Home() {
             filteredReviews={filteredReviews}
             managers={managers}
             role={effectiveRole}
-            onArchive={requestArchiveReview}
             onCreateShare={createShareLink}
             onCreateReportShare={createReportShareLink}
             onEdit={startEdit}
@@ -898,7 +873,6 @@ export default function Home() {
             review={selectedReview}
             role={effectiveRole}
             links={shareLinks.filter((link) => link.reviewId === selectedReview?.id)}
-            onArchive={requestArchiveReview}
             onCreateShare={createShareLink}
             onCreateReportShare={createReportShareLink}
             onEdit={startEdit}
@@ -954,10 +928,8 @@ function viewTitle(view) {
 
 function getStats(reviews) {
   const openFollowUps = reviews.filter(isActionableFollowUp).length;
-  const overdueFollowUps = reviews.filter((review) => getFollowUpDueState(review) === "overdue").length;
   const attachmentCount = reviews.reduce((total, review) => total + (review.attachments || []).length, 0);
-  const culinaryFlagCount = reviews.filter((review) => (review.tags || []).includes("culinary")).length;
-  const tagCounts = tagOptions.map((tag) => ({ tag, count: reviews.filter((review) => (review.tags || []).includes(tag)).length })).filter((item) => item.count > 0).sort((a, b) => b.count - a.count);
+  const culinaryFlagCount = reviews.filter(hasCulinarySignal).length;
   const months = reviews.reduce((acc, review) => {
     const key = review.eventDate.slice(0, 7);
     if (!acc[key]) acc[key] = { label: key, count: 0, ratingCount: 0 };
@@ -970,10 +942,8 @@ function getStats(reviews) {
   return {
     total: reviews.length,
     openFollowUps,
-    overdueFollowUps,
     attachmentCount,
     culinaryFlagCount,
-    tagCounts,
     monthlyTrend: Object.values(months).sort((a, b) => a.label.localeCompare(b.label)).slice(-6),
   };
 }
@@ -1043,20 +1013,20 @@ function NavButton({ active, icon, label, onClick }) {
 function Dashboard({ stats, reviews, role, onSelect }) {
   const recent = [...reviews].sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)).slice(0, 5);
   const followUps = reviews.filter(isActionableFollowUp).sort(sortFollowUps).slice(0, 5);
-  const culinaryReviews = reviews.filter((review) => (review.tags || []).includes("culinary")).sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)).slice(0, 5);
+  const culinaryReviews = reviews.filter(hasCulinarySignal).sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)).slice(0, 5);
   const maxTrendCount = Math.max(1, ...stats.monthlyTrend.map((item) => item.count));
   return (
     <div className="view-grid">
-      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Events" value={stats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={stats.openFollowUps} /><MetricCard icon={<AlertTriangle />} label="Overdue" value={stats.overdueFollowUps} /><MetricCard icon={<Utensils />} label="Culinary flags" value={stats.culinaryFlagCount} /></section>
+      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Events" value={stats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={stats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={stats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={stats.culinaryFlagCount} /></section>
       <section className="content-band two-column">
         <div><div className="section-heading"><h3>Recent Reviews</h3><span>{role === "leadership" ? "Read-only" : "Manager entry"}</span></div><div className="review-list">{recent.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{formatDate(review.eventDate)} - {review.venue}</span></div><StatusPill status={review.followUpStatus} /></button>)}{recent.length === 0 && <EmptyState title="No reviews yet" />}</div></div>
-        <div><div className="section-heading"><h3>Common Tags</h3><span>Trend signal</span></div><div className="tag-counts">{stats.tagCounts.map((item) => <div className="tag-count" key={item.tag}><span>{item.tag}</span><strong>{item.count}</strong></div>)}{stats.tagCounts.length === 0 && <p className="small-muted">Tags appear after reviews are added.</p>}</div></div>
+        <div><div className="section-heading"><h3>Review Signals</h3><span>Current view</span></div><div className="tag-counts"><div className="tag-count"><span>Rated reviews</span><strong>{reviews.filter((review) => review.overallRating).length}</strong></div><div className="tag-count"><span>Attachments</span><strong>{stats.attachmentCount}</strong></div><div className="tag-count"><span>Needs follow-up</span><strong>{stats.openFollowUps}</strong></div></div></div>
       </section>
       <section className="content-band two-column">
-        <div><div className="section-heading"><h3>Follow-up Queue</h3><span>{followUps.length} shown</span></div><div className="review-list">{followUps.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{followUpQueueText(review)}</span></div><div className="queue-pills"><DuePill review={review} /><StatusPill status={review.followUpStatus} /></div></button>)}{followUps.length === 0 && <p className="small-muted">No open follow-ups.</p>}</div></div>
-        <div><div className="section-heading"><h3>Culinary Notes</h3><span>Tagged culinary</span></div><div className="review-list">{culinaryReviews.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{previewText(review.culinaryNotes)}</span></div><StatusPill status={review.followUpStatus} /></button>)}{culinaryReviews.length === 0 && <p className="small-muted">No culinary-tagged reviews.</p>}</div></div>
+        <div><div className="section-heading"><h3>Follow-up Queue</h3><span>{followUps.length} shown</span></div><div className="review-list">{followUps.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{followUpQueueText(review)}</span></div><div className="queue-pills"><StatusPill status={review.followUpStatus} /></div></button>)}{followUps.length === 0 && <p className="small-muted">No open follow-ups.</p>}</div></div>
+        <div><div className="section-heading"><h3>Culinary Notes</h3><span>Entered notes</span></div><div className="review-list">{culinaryReviews.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{previewText(review.culinaryNotes)}</span></div><StatusPill status={review.followUpStatus} /></button>)}{culinaryReviews.length === 0 && <p className="small-muted">No culinary notes entered.</p>}</div></div>
       </section>
-      <section className="content-band"><div className="section-heading"><h3>Event Volume</h3><span>Rating is optional</span></div><div className="trend-grid">{stats.monthlyTrend.map((item) => <div className="trend-item" key={item.label}><span>{item.label}</span><div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(8, (item.count / maxTrendCount) * 100)}%` }} /></div><strong>{item.count}</strong><em>{item.ratingCount ? `${item.ratingCount} rated` : "No rating"}</em></div>)}{stats.monthlyTrend.length === 0 && <p className="small-muted">Trend data appears after reviews are added.</p>}</div></section>
+      <section className="content-band"><div className="section-heading"><h3>Event Volume</h3><span>Rating required</span></div><div className="trend-grid">{stats.monthlyTrend.map((item) => <div className="trend-item" key={item.label}><span>{item.label}</span><div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(8, (item.count / maxTrendCount) * 100)}%` }} /></div><strong>{item.count}</strong><em>{item.ratingCount ? `${item.ratingCount} rated` : "No rating"}</em></div>)}{stats.monthlyTrend.length === 0 && <p className="small-muted">Trend data appears after reviews are added.</p>}</div></section>
     </div>
   );
 }
@@ -1071,12 +1041,12 @@ function ExecutiveBrief({ reviews, onSelect, showPrintButton = true }) {
   return (
     <div className="view-grid executive-brief">
       <section className="brief-hero">
-        <div><p className="eyebrow">Last 30 days</p><h3>{briefStats.total} events reviewed</h3><span>{briefStats.openFollowUps} open follow-ups | {briefStats.overdueFollowUps} overdue | {briefStats.culinaryFlagCount} culinary flags</span></div>
+        <div><p className="eyebrow">Last 30 days</p><h3>{briefStats.total} events reviewed</h3><span>{briefStats.openFollowUps} open follow-ups | {briefStats.attachmentCount} attachments | {briefStats.culinaryFlagCount} culinary notes</span></div>
         {showPrintButton && <button className="secondary-button" onClick={() => window.print()} type="button"><Printer size={16} />PDF</button>}
       </section>
-      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Recent events" value={briefStats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={briefStats.openFollowUps} /><MetricCard icon={<AlertTriangle />} label="Overdue" value={briefStats.overdueFollowUps} /><MetricCard icon={<Utensils />} label="Culinary flags" value={briefStats.culinaryFlagCount} /></section>
+      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Recent events" value={briefStats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={briefStats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={briefStats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={briefStats.culinaryFlagCount} /></section>
       <section className="content-band two-column">
-        <div><div className="section-heading"><h3>Attention Items</h3><span>{attentionItems.length} active</span></div><div className="brief-list">{attentionItems.map((review) => <button className="brief-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{followUpMeta(review)}</span><p>{previewText(review.issues || review.operationalNotes)}</p></div><DuePill review={review} /></button>)}{attentionItems.length === 0 && <p className="small-muted">No open follow-ups.</p>}</div></div>
+        <div><div className="section-heading"><h3>Attention Items</h3><span>{attentionItems.length} active</span></div><div className="brief-list">{attentionItems.map((review) => <button className="brief-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{followUpMeta(review)}</span><p>{previewText(review.issues || review.operationalNotes)}</p></div><StatusPill status={review.followUpStatus} /></button>)}{attentionItems.length === 0 && <p className="small-muted">No open follow-ups.</p>}</div></div>
         <div><div className="section-heading"><h3>Culinary Watchlist</h3><span>{culinaryItems.length} noted</span></div><div className="brief-list">{culinaryItems.map((review) => <button className="brief-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{formatDate(review.eventDate)} | {review.venue}</span><p>{previewText(review.culinaryNotes)}</p></div><StatusPill status={review.followUpStatus} /></button>)}{culinaryItems.length === 0 && <p className="small-muted">No culinary notes in the last 30 days.</p>}</div></div>
       </section>
       <section className="content-band">
@@ -1091,16 +1061,14 @@ function MetricCard({ icon, label, value }) {
   return <div className="metric-card"><div className="metric-icon">{icon}</div><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function ArchiveView({ filters, filteredReviews, managers, role, onArchive, onCreateShare, onCreateReportShare, onEdit, onExport, onFilter, onResetFilters, onSelect }) {
+function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, onCreateReportShare, onEdit, onExport, onFilter, onResetFilters, onSelect }) {
   const archiveStats = getStats(filteredReviews);
   const filterSummary = formatReportFilters(filters);
   return (
     <div className="view-grid">
       <section className="filter-bar">
-        <label className="search-box"><Search size={18} /><input aria-label="Search reviews" onChange={(event) => onFilter("query", event.target.value)} placeholder="Search client, venue, notes, tags" value={filters.query} /></label>
+        <label className="search-box"><Search size={18} /><input aria-label="Search reviews" onChange={(event) => onFilter("query", event.target.value)} placeholder="Search client, contact, venue, notes" value={filters.query} /></label>
         <Select icon={<Filter size={16} />} label="Status" onChange={(value) => onFilter("status", value)} options={["All", ...statusOptions]} value={filters.status} />
-        <Select icon={<AlertTriangle size={16} />} label="Due" onChange={(value) => onFilter("due", value)} options={dueFilterOptions} value={filters.due} />
-        <Select icon={<Utensils size={16} />} label="Tag" onChange={(value) => onFilter("tag", value)} options={["All", ...tagOptions]} value={filters.tag} />
         <Select icon={<Users size={16} />} label="Manager" onChange={(value) => onFilter("manager", value)} options={["All", ...managers]} value={filters.manager} />
         <DateFilter label="From" onChange={(value) => onFilter("dateFrom", value)} value={filters.dateFrom} />
         <DateFilter label="To" onChange={(value) => onFilter("dateTo", value)} value={filters.dateTo} />
@@ -1108,13 +1076,13 @@ function ArchiveView({ filters, filteredReviews, managers, role, onArchive, onCr
         <button className="secondary-button" onClick={onExport} type="button"><Download size={16} />CSV</button>
         {role === "manager" && <button className="secondary-button" onClick={() => onCreateReportShare()} type="button"><Share2 size={16} />Report</button>}
       </section>
-      <section className="archive-summary"><div><p className="eyebrow">Current View</p><strong>{filterSummary}</strong></div><div className="archive-summary-metrics"><span>{archiveStats.total} matching</span><span>{archiveStats.openFollowUps} open</span><span>{archiveStats.overdueFollowUps} overdue</span><span>{archiveStats.culinaryFlagCount} culinary</span></div></section>
-      <section className="content-band"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Status</th><th>Follow-up</th><th>Tags</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><TagList tags={review.tags.slice(0, 3)} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button><button className="icon-button" onClick={() => onArchive(review.id)} title="Close" type="button"><Archive size={16} /></button></>}</div></td></tr>)}</tbody></table></div>{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
+      <section className="archive-summary"><div><p className="eyebrow">Current View</p><strong>{filterSummary}</strong></div><div className="archive-summary-metrics"><span>{archiveStats.total} matching</span><span>{archiveStats.openFollowUps} open</span><span>{archiveStats.attachmentCount} attachments</span><span>{archiveStats.culinaryFlagCount} culinary</span></div></section>
+      <section className="content-band"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Status</th><th>Follow-up</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div>{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
     </div>
   );
 }
 
-function ReviewDetail({ review, role, links, onArchive, onCreateShare, onEdit, onPrint, onSetStatus = () => {} }) {
+function ReviewDetail({ review, role, links, onCreateShare, onEdit, onPrint, onSetStatus = () => {} }) {
   if (!review) {
     return (
       <section className="content-band unavailable">
@@ -1127,30 +1095,37 @@ function ReviewDetail({ review, role, links, onArchive, onCreateShare, onEdit, o
 
   return (
     <div className="detail-layout">
-      <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span></div></div><div className="detail-actions"><DuePill review={review} /><StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
-      <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} /><DetailBlock title="Follow-up Owner" value={review.followUpOwner} /><DetailBlock title="Follow-up Due" value={followUpDueSummary(review)} /><DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
-      <section className="content-band two-column"><div><div className="section-heading"><h3>Staff Involved</h3><span>{review.staffInvolved.length}</span></div><div className="people-list">{review.staffInvolved.map((person) => <span key={person}>{person}</span>)}</div></div><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><TagList tags={review.tags} /></div></section>
-      <section className="content-band two-column"><AttachmentList attachments={review.attachments} /><div><div className="section-heading"><h3>Shared Access</h3><span>{links.filter(isShareActive).length} active</span></div><div className="share-mini-list">{links.length === 0 && <p className="small-muted">No links created.</p>}{links.slice(0, 3).map((link) => <div className="share-mini" key={link.id}><span>{isShareActive(link) ? "Active" : "Inactive"}</span><em>Expires {formatDate(link.expiresAt.slice(0, 10))}</em></div>)}</div></div></section>
-      {role === "manager" && <div className="sticky-actions status-actions">{review.followUpStatus !== "Needs follow-up" && <button className="secondary-button" onClick={() => onSetStatus(review.id, "Needs follow-up")} type="button"><AlertTriangle size={16} />Needs Follow-up</button>}{review.followUpStatus !== "Reviewed" && <button className="secondary-button" onClick={() => onSetStatus(review.id, "Reviewed")} type="button"><CheckCircle2 size={16} />Mark Reviewed</button>}{review.followUpStatus !== "Closed" && <button className="secondary-button" onClick={() => onArchive(review.id)} type="button"><Archive size={16} />Mark Closed</button>}</div>}
+      <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions"><StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
+      <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
+      <section className="content-band two-column"><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><div className="people-list"><span>{isActionableFollowUp(review) ? "Needs follow-up" : "No follow-up needed"}</span><span>{hasCulinarySignal(review) ? "Culinary notes entered" : "No culinary note"}</span></div></div><AttachmentList attachments={review.attachments || []} /></section>
+      <section className="content-band"><div className="section-heading"><h3>Shared Access</h3><span>{links.filter(isShareActive).length} active</span></div><div className="share-mini-list">{links.length === 0 && <p className="small-muted">No links created.</p>}{links.slice(0, 3).map((link) => <div className="share-mini" key={link.id}><span>{isShareActive(link) ? "Active" : "Inactive"}</span><em>Expires {formatDate(link.expiresAt.slice(0, 10))}</em></div>)}</div></section>
+      {role === "manager" && <div className="sticky-actions status-actions">{review.followUpStatus !== "Needs follow-up" ? <button className="secondary-button" onClick={() => onSetStatus(review.id, "Needs follow-up")} type="button"><AlertTriangle size={16} />Needs Follow-up</button> : <button className="secondary-button" onClick={() => onSetStatus(review.id, "Draft")} type="button"><CheckCircle2 size={16} />No Follow-up</button>}</div>}
     </div>
   );
 }
 
 function ReviewForm({ review, onCancel, onSave }) {
-  const [form, setForm] = useState(() => ({ ...blankReview(), ...review, staffInvolved: Array.isArray(review.staffInvolved) ? review.staffInvolved.join(", ") : review.staffInvolved || "" }));
+  const [form, setForm] = useState(() => ({ ...blankReview(), ...review }));
   function update(key, value) { setForm((current) => ({ ...current, [key]: value })); }
-  function toggleTag(tag) { setForm((current) => ({ ...current, tags: current.tags.includes(tag) ? current.tags.filter((item) => item !== tag) : [...current.tags, tag] })); }
+  function setNeedsFollowUp(value) {
+    setForm((current) => ({
+      ...current,
+      followUpStatus: value === "Yes" ? "Needs follow-up" : "Draft",
+      followUpNotes: value === "Yes" ? current.followUpNotes : "",
+    }));
+  }
   function addAttachments(files) {
     const mapped = Array.from(files || []).map((file) => ({ id: makeId("att"), name: file.name, type: file.type || "application/octet-stream", size: file.size, uploadedAt: new Date().toISOString(), isPendingUpload: true, file }));
     setForm((current) => ({ ...current, attachments: [...current.attachments, ...mapped] }));
   }
   function removeAttachment(id) { setForm((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) })); }
   function submit(event) { event.preventDefault(); onSave(form); }
+  const needsFollowUp = form.followUpStatus === "Needs follow-up";
   return (
     <form className="review-form" onSubmit={submit}>
-      <section className="form-section"><div className="section-heading"><h3>Event</h3><span>{form.id ? "Edit" : "New"}</span></div><div className="form-grid"><TextInput label="Event / Client" onChange={(value) => update("clientName", value)} required value={form.clientName} /><TextInput label="Date" onChange={(value) => update("eventDate", value)} required type="date" value={form.eventDate} /><TextInput label="Venue / Location" onChange={(value) => update("venue", value)} required value={form.venue} /><SelectInput label="Event Type" onChange={(value) => update("eventType", value)} options={eventTypes} value={form.eventType} /><TextInput label="Manager" onChange={(value) => update("managerName", value)} required value={form.managerName} /><TextInput label="Staff Involved" onChange={(value) => update("staffInvolved", value)} value={form.staffInvolved} /></div></section>
-      <section className="form-section"><div className="section-heading"><h3>Review</h3><span>Optional rating</span></div><div className="form-grid"><SelectInput label="Overall Rating" onChange={(value) => update("overallRating", value)} options={["", "1", "2", "3", "4", "5"]} renderOption={(value) => (value ? `${value}/5` : "N/A")} value={String(form.overallRating ?? "")} /><SelectInput label="Follow-up Status" onChange={(value) => update("followUpStatus", value)} options={statusOptions} value={form.followUpStatus} /><TextInput label="Follow-up Owner" onChange={(value) => update("followUpOwner", value)} value={form.followUpOwner || ""} /><TextInput label="Follow-up Due" onChange={(value) => update("followUpDueDate", value)} type="date" value={form.followUpDueDate || ""} /></div><TextArea label="Event Summary" onChange={(value) => update("summary", value)} value={form.summary} /><TextArea label="Food / Culinary Notes" onChange={(value) => update("culinaryNotes", value)} value={form.culinaryNotes} /><TextArea label="Operational Notes" onChange={(value) => update("operationalNotes", value)} value={form.operationalNotes} /><TextArea label="Client Feedback" onChange={(value) => update("clientFeedback", value)} value={form.clientFeedback} /><div className="form-grid"><TextArea label="Wins" onChange={(value) => update("wins", value)} value={form.wins} /><TextArea label="Issues" onChange={(value) => update("issues", value)} value={form.issues} /></div></section>
-      <section className="form-section"><div className="section-heading"><h3>Tags & Files</h3><span>{form.attachments.length} attachments</span></div><div className="tag-picker">{tagOptions.map((tag) => <button className={form.tags.includes(tag) ? "tag-chip selected" : "tag-chip"} key={tag} onClick={() => toggleTag(tag)} type="button">{tag}</button>)}</div><label className="upload-box"><Upload size={20} /><span>Attach PDFs or photos</span><input accept=".pdf,image/*" multiple onChange={(event) => addAttachments(event.target.files)} type="file" /></label><div className="attachment-editor">{form.attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}<span>{attachment.name}</span><em>{formatFileSize(attachment.size)}{attachment.isPendingUpload ? " pending" : ""}</em><button type="button" onClick={() => removeAttachment(attachment.id)} title="Remove"><X size={16} /></button></div>)}</div></section>
+      <section className="form-section"><div className="section-heading"><h3>Event</h3><span>{form.id ? "Edit" : "New"}</span></div><div className="form-grid"><TextInput label="Date" onChange={(value) => update("eventDate", value)} required type="date" value={form.eventDate} /><TextInput label="Event / Client" onChange={(value) => update("clientName", value)} required value={form.clientName} /><TextInput label="Client Contact" onChange={(value) => update("clientContact", value)} value={form.clientContact || ""} /><TextInput label="Venue / Location" onChange={(value) => update("venue", value)} required value={form.venue} /><SelectInput label="Event Type" onChange={(value) => update("eventType", value)} options={eventTypes} value={form.eventType} /><TextInput label="Manager" onChange={(value) => update("managerName", value)} required value={form.managerName} /></div></section>
+      <section className="form-section"><div className="section-heading"><h3>Review</h3><span>Rating required</span></div><div className="form-grid"><SelectInput label="Overall Rating" onChange={(value) => update("overallRating", value)} options={["", "1", "2", "3", "4", "5"]} renderOption={(value) => (value ? `${value}/5` : "Select rating")} required value={String(form.overallRating ?? "")} /><SelectInput label="Needs Follow-up" onChange={setNeedsFollowUp} options={["No", "Yes"]} value={needsFollowUp ? "Yes" : "No"} /></div>{needsFollowUp && <TextArea label="Follow-up Notes" onChange={(value) => update("followUpNotes", value)} value={form.followUpNotes || ""} />}<TextArea label="Event Summary" onChange={(value) => update("summary", value)} value={form.summary} /><TextArea label="Food / Culinary Notes" onChange={(value) => update("culinaryNotes", value)} value={form.culinaryNotes} /><TextArea label="Operational Notes" onChange={(value) => update("operationalNotes", value)} value={form.operationalNotes} /><TextArea label="Client Feedback" onChange={(value) => update("clientFeedback", value)} value={form.clientFeedback} /><div className="form-grid"><TextArea label="Wins" onChange={(value) => update("wins", value)} value={form.wins} /><TextArea label="Issues" onChange={(value) => update("issues", value)} value={form.issues} /></div></section>
+      <section className="form-section"><div className="section-heading"><h3>Files</h3><span>{form.attachments.length} attachments</span></div><label className="upload-box"><Upload size={20} /><span>Attach PDFs or photos</span><input accept=".pdf,image/*" multiple onChange={(event) => addAttachments(event.target.files)} type="file" /></label><div className="attachment-editor">{form.attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}<span>{attachment.name}</span><em>{formatFileSize(attachment.size)}{attachment.isPendingUpload ? " pending" : ""}</em><button type="button" onClick={() => removeAttachment(attachment.id)} title="Remove"><X size={16} /></button></div>)}</div></section>
       <div className="form-actions"><button className="secondary-button" onClick={onCancel} type="button"><X size={16} />Cancel</button><button className="primary-button" type="submit"><Save size={16} />Save Review</button></div>
     </form>
   );
@@ -1253,7 +1228,7 @@ function SharedReviewView({ brief, error, link, loading, report, review, onExit,
   return (
     <main className="shared-shell">
       <header className="shared-topbar"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1></div><div className="topbar-actions"><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button><button className="secondary-button" onClick={onExit} type="button"><X size={16} />Exit</button></div></header>
-      {loading ? <section className="content-band unavailable"><ClipboardList size={28} /><h2>Loading link</h2></section> : inactive ? <section className="content-band unavailable"><AlertTriangle size={28} /><h2>Link unavailable</h2><p>{error || "This link is expired, revoked, or not present in this review store."}</p></section> : isBrief ? <SharedBriefView brief={brief} onPrint={onPrint} /> : isReport ? <SharedReportView link={link} report={report} onPrint={onPrint} /> : <ReviewDetail links={[link]} onArchive={() => {}} onCreateShare={() => {}} onEdit={() => {}} onPrint={onPrint} review={review} role="leadership" />}
+      {loading ? <section className="content-band unavailable"><ClipboardList size={28} /><h2>Loading link</h2></section> : inactive ? <section className="content-band unavailable"><AlertTriangle size={28} /><h2>Link unavailable</h2><p>{error || "This link is expired, revoked, or not present in this review store."}</p></section> : isBrief ? <SharedBriefView brief={brief} onPrint={onPrint} /> : isReport ? <SharedReportView link={link} report={report} onPrint={onPrint} /> : <ReviewDetail links={[link]} onCreateShare={() => {}} onEdit={() => {}} onPrint={onPrint} review={review} role="leadership" />}
     </main>
   );
 }
@@ -1265,7 +1240,7 @@ function SharedBriefView({ brief, onPrint }) {
     return (
       <div className="view-grid">
         <div className="sticky-actions shared-brief-actions"><button className="secondary-button" onClick={() => setSelectedReview(null)} type="button"><FileText size={16} />Back to Brief</button></div>
-        <ReviewDetail links={[]} onArchive={() => {}} onCreateShare={() => {}} onEdit={() => {}} onPrint={onPrint} review={selectedReview} role="leadership" />
+        <ReviewDetail links={[]} onCreateShare={() => {}} onEdit={() => {}} onPrint={onPrint} review={selectedReview} role="leadership" />
       </div>
     );
   }
@@ -1282,18 +1257,18 @@ function SharedReportView({ link, report, onPrint }) {
     return (
       <div className="view-grid">
         <div className="sticky-actions shared-brief-actions"><button className="secondary-button" onClick={() => setSelectedReview(null)} type="button"><FileText size={16} />Back to Report</button></div>
-        <ReviewDetail links={[]} onArchive={() => {}} onCreateShare={() => {}} onEdit={() => {}} onPrint={onPrint} review={selectedReview} role="leadership" />
+        <ReviewDetail links={[]} onCreateShare={() => {}} onEdit={() => {}} onPrint={onPrint} review={selectedReview} role="leadership" />
       </div>
     );
   }
 
   return (
     <div className="view-grid">
-      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Events" value={stats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={stats.openFollowUps} /><MetricCard icon={<AlertTriangle />} label="Overdue" value={stats.overdueFollowUps} /><MetricCard icon={<Utensils />} label="Culinary flags" value={stats.culinaryFlagCount} /></section>
+      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Events" value={stats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={stats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={stats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={stats.culinaryFlagCount} /></section>
       <section className="content-band">
         <div className="section-heading"><h3>Shared Report</h3><span>Expires {formatDate(link.expiresAt.slice(0, 10))}</span></div>
         <div className="report-filter-summary"><Filter size={16} /><span>{formatReportFilters(report?.filters)}</span></div>
-        <div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Status</th><th>Follow-up</th><th>Tags</th></tr></thead><tbody>{reviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => setSelectedReview(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><TagList tags={review.tags.slice(0, 3)} /></td></tr>)}</tbody></table></div>
+        <div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Status</th><th>Follow-up</th></tr></thead><tbody>{reviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => setSelectedReview(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td></tr>)}</tbody></table></div>
         {reviews.length === 0 && <EmptyState title="No reviews in this report" />}
       </section>
       <div className="sticky-actions"><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button></div>
@@ -1317,23 +1292,13 @@ function AttachmentList({ attachments }) {
 }
 
 function StatusPill({ status }) {
-  const key = status.toLowerCase().replaceAll(" ", "-");
-  return <span className={`status-pill ${key}`}>{status}</span>;
-}
-
-function DuePill({ review }) {
-  const state = getFollowUpDueState(review);
-  if (state === "inactive") return null;
-  return <span className={`due-pill ${state}`}>{followUpDueLabel(review)}</span>;
+  const displayStatus = status === "Needs follow-up" ? "Needs follow-up" : "Draft";
+  const key = displayStatus.toLowerCase().replaceAll(" ", "-");
+  return <span className={`status-pill ${key}`}>{displayStatus}</span>;
 }
 
 function FollowUpCell({ review }) {
-  return <div className="follow-up-cell"><span>{followUpMeta(review)}</span><DuePill review={review} /></div>;
-}
-
-function TagList({ tags }) {
-  if (!tags || tags.length === 0) return <span className="small-muted">N/A</span>;
-  return <div className="tag-list">{tags.map((tag) => <span key={tag}>{tag}</span>)}</div>;
+  return <div className="follow-up-cell"><span>{isActionableFollowUp(review) ? followUpMeta(review) : "No"}</span></div>;
 }
 
 function EmptyState({ title }) {
@@ -1352,8 +1317,8 @@ function TextInput({ disabled = false, label, onChange, required, type = "text",
   return <label className="field"><span>{label}</span><input disabled={disabled} onChange={(event) => onChange(event.target.value)} required={required} type={type} value={value} /></label>;
 }
 
-function SelectInput({ disabled = false, label, onChange, options, renderOption, value }) {
-  return <label className="field"><span>{label}</span><select disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>{options.map((option) => <option key={option || "blank"} value={option}>{renderOption ? renderOption(option) : option}</option>)}</select></label>;
+function SelectInput({ disabled = false, label, onChange, options, renderOption, required = false, value }) {
+  return <label className="field"><span>{label}</span><select disabled={disabled} onChange={(event) => onChange(event.target.value)} required={required} value={value}>{options.map((option) => <option key={option || "blank"} value={option}>{renderOption ? renderOption(option) : option}</option>)}</select></label>;
 }
 
 function TextArea({ label, onChange, value }) {

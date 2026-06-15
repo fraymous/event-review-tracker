@@ -6,11 +6,11 @@ A hosted-ready Next.js prototype for banquet and event review tracking.
 
 - Manager-focused review entry for one event at a time
 - Executive/director read-only view toggle
-- Dashboard with recent events, follow-up queue, overdue follow-up count, culinary notes queue, owner/due follow-up tracking, common tags, event volume, and culinary flags
+- Dashboard with recent events, follow-up queue, attachment count, culinary notes queue, event volume, and review signals
 - Executive Brief view for a printable 30-day leadership snapshot with attention items, culinary watchlist, and recent event notes
-- Searchable event archive with status, due-status, tag, manager, date-range filters, current-view summary, and full-note CSV export
-- Event detail view with food/culinary notes, operational notes, client feedback, wins, issues, tags, staff, and attachments
-- Manager quick actions for marking reviews as reviewed, needing follow-up, or closed from the detail view
+- Searchable event archive with status, manager, date-range filters, current-view summary, and full-note CSV export
+- Event detail view with client contact, food/culinary notes, operational notes, client feedback, wins, issues, follow-up notes, shared access, and attachments
+- Manager quick actions for marking whether a review needs follow-up from the detail view
 - Access directory for role-based manager and leadership visibility
 - Revocable single-review, executive-brief, and filtered-report share links with manager-selected expiration and a visible copy fallback
 - JSON backup and restore for local-demo data while the app is being used before hosted storage is connected
@@ -45,13 +45,13 @@ Before Supabase is connected, use Sharing & Access > Data Backup to download a J
 
 - Managers create and edit reviews, upload private attachments, invite users, and create share links.
 - Executives/directors can view all reviews in read-only mode.
-- Follow-up items can carry an owner and due date, with overdue items called out for accountability.
+- Follow-up is a simple yes/no flag in V1. When set to yes, managers add follow-up notes.
 - Shared links expose one review, the executive brief, or a filtered report and can be revoked or expired.
 - The Access Directory shows role-based users in the organization; public share links remain separate from account access.
 
 ## Scoring stance
 
-V1 does not use service, setup, or timing sub-scores. Because managers are self-entering event reviews, the app treats the overall rating as optional context rather than a primary executive KPI. Dashboards emphasize event volume, open and overdue follow-ups, culinary flags, and review notes.
+V1 does not use service, setup, or timing sub-scores. Because managers are self-entering event reviews, the app keeps one required overall rating for quick event quality context, but dashboards avoid treating it as a standalone executive KPI. The useful management signals are the written review, culinary notes, client feedback, wins, issues, attachments, and whether follow-up is needed.
 
 ## Next production step
 
@@ -65,7 +65,7 @@ When `.env.local` contains Supabase keys, the app switches from local demo stora
 
 - Sign in / sign up through Supabase Auth
 - First signed-in user can create the initial manager workspace profile
-- Managers can create, edit, close, share, and attach files to reviews
+- Managers can create, edit, share, and attach files to reviews
 - Executives/directors can read all reviews when their `profiles.role` is set to `leadership`
 - Attachments upload to the private `review-attachments` bucket
 - Shared review links are read through `/api/shared-review/[token]` using `SUPABASE_SERVICE_ROLE_KEY`
@@ -85,4 +85,4 @@ This route uses `SUPABASE_SERVICE_ROLE_KEY`, so it only works after that environ
 
 ## Report share links
 
-Share links support three scopes: `single-review`, `executive-brief`, and `filtered-report`. Managers choose an expiration window before creating links. Brief links render the 30-day leadership snapshot. Filtered report links store the archive filters used when the link was created, including due status and date range, and render a read-only event list with summary metrics. The report view displays the saved filter summary so recipients know whether they are seeing all reviews or a specific archive slice, and each event row can open the full read-only review detail.
+Share links support three scopes: `single-review`, `executive-brief`, and `filtered-report`. Managers choose an expiration window before creating links. Brief links render the 30-day leadership snapshot. Filtered report links store the archive filters used when the link was created, including status and date range, and render a read-only event list with summary metrics. The report view displays the saved filter summary so recipients know whether they are seeing all reviews or a specific archive slice, and each event row can open the full read-only review detail.
