@@ -38,7 +38,7 @@ Keep `SUPABASE_SERVICE_ROLE_KEY` server-only.
 2. Confirm `storageMode` is `supabase`.
 3. Confirm `publicSharedLinks` and `managerInvites` are `true`.
 4. Confirm `firstManagerSignup` is `false` after the first manager profile exists.
-5. Create one review with culinary notes, consumption counts, and follow-up notes.
+5. Create one review with culinary notes, optional consumption counts, and follow-up notes.
 6. Confirm the dashboard and archive call out reviews that need follow-up.
 7. Upload one attachment.
 8. Create an executive brief share link and open it in a private browser.
