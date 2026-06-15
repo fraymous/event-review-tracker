@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Archive,
+  ArrowUpDown,
   BarChart3,
   Building2,
   CalendarDays,
@@ -57,6 +58,7 @@ import {
   normalizeConsumption,
   saveReviews,
   saveShareLinks,
+  sortReviewList,
 } from "../lib/review-store";
 import {
   bootstrapManagerProfile,
@@ -86,7 +88,9 @@ const demoAccessUsers = [
 ];
 
 const initialFilters = { query: "", status: "All", tag: "All", manager: "All", due: "All", dateFrom: "", dateTo: "" };
+const initialSortMode = "Date newest";
 const followUpFilterOptions = ["All", "No", "Yes"];
+const reviewSortOptions = [initialSortMode, "Date oldest", "Rating high", "Rating low", "Needs follow-up"];
 const shareExpiryOptions = [7, 14, 30, 60, 90];
 const backupType = "event-review-tracker-backup";
 
@@ -236,6 +240,7 @@ function formatReportFilters(filters = {}) {
   if (normalized.due !== "All") parts.push(`Due: ${normalized.due}`);
   if (normalized.dateFrom) parts.push(`From: ${formatDate(normalized.dateFrom)}`);
   if (normalized.dateTo) parts.push(`To: ${formatDate(normalized.dateTo)}`);
+  if (normalized.sortMode && normalized.sortMode !== initialSortMode) parts.push(`Sort: ${normalized.sortMode}`);
   return parts.length ? parts.join(" | ") : "All reviews";
 }
 
@@ -267,6 +272,7 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState(seedReviews[0]?.id || "");
   const [editingReview, setEditingReview] = useState(null);
   const [filters, setFilters] = useState(initialFilters);
+  const [sortMode, setSortMode] = useState(initialSortMode);
   const [shareExpiryDays, setShareExpiryDays] = useState(30);
   const [notice, setNotice] = useState("");
   const [errorNotice, setErrorNotice] = useState("");
@@ -449,8 +455,9 @@ export default function Home() {
   const managers = useMemo(() => Array.from(new Set(reviews.map((review) => review.managerName))).sort(), [reviews]);
 
   const filteredReviews = useMemo(() => applyReviewFilters(reviews, filters), [filters, reviews]);
+  const sortedReviews = useMemo(() => sortReviewList(filteredReviews, sortMode), [filteredReviews, sortMode]);
 
-  const selectedReview = useMemo(() => reviews.find((review) => review.id === selectedId) || filteredReviews[0] || reviews[0], [filteredReviews, reviews, selectedId]);
+  const selectedReview = useMemo(() => reviews.find((review) => review.id === selectedId) || sortedReviews[0] || reviews[0], [reviews, selectedId, sortedReviews]);
   const stats = useMemo(() => getStats(reviews), [reviews]);
   const sharedLink = useMemo(() => shareToken ? shareLinks.find((link) => link.token === shareToken) : null, [shareLinks, shareToken]);
   const sharedReview = useMemo(() => {
@@ -690,7 +697,7 @@ export default function Home() {
   async function createReportShareLink(reportFilters = filters) {
     if (effectiveRole !== "manager") return false;
     const sourceFilters = reportFilters?.currentTarget ? filters : reportFilters;
-    const normalizedFilters = { ...initialFilters, ...sourceFilters };
+    const normalizedFilters = { ...initialFilters, sortMode, ...sourceFilters };
 
     if (remoteMode && supabaseClient && profile) {
       try {
@@ -830,7 +837,7 @@ export default function Home() {
     }
   }
   function exportCsv() {
-    downloadFile(`event-reviews-${new Date().toISOString().slice(0, 10)}.csv`, buildCsv(filteredReviews), "text/csv");
+    downloadFile(`event-reviews-${new Date().toISOString().slice(0, 10)}.csv`, buildCsv(sortedReviews), "text/csv");
   }
 
   function downloadFile(filename, contents, type) {
@@ -875,6 +882,7 @@ export default function Home() {
     setShareLinks(backup.shareLinks);
     setSelectedId(backup.reviews[0]?.id || "");
     setFilters(initialFilters);
+    setSortMode(initialSortMode);
     setActiveView("dashboard");
     setNotice(`Backup restored with ${backup.reviews.length} reviews.`);
   }
@@ -912,6 +920,7 @@ export default function Home() {
     setReviews(seedReviews);
     setShareLinks([]);
     setSelectedId(seedReviews[0]?.id || "");
+    setSortMode(initialSortMode);
     setNotice("Demo data restored.");
   }
 
@@ -939,7 +948,10 @@ export default function Home() {
       : sharedLink?.scope === "filtered-report"
         ? {
             filters: sharedLink.filters || initialFilters,
-            reviews: applyReviewFilters(reviews, sharedLink.filters || initialFilters),
+            reviews: sortReviewList(
+              applyReviewFilters(reviews, sharedLink.filters || initialFilters),
+              sharedLink.filters?.sortMode || initialSortMode
+            ),
           }
         : null;
     const brief = remoteMode
@@ -1059,7 +1071,7 @@ export default function Home() {
         {activeView === "archive" && (
           <ArchiveView
             filters={filters}
-            filteredReviews={filteredReviews}
+            filteredReviews={sortedReviews}
             managers={managers}
             role={effectiveRole}
             onCreateShare={createShareLink}
@@ -1068,8 +1080,10 @@ export default function Home() {
             onEdit={startEdit}
             onExport={exportCsv}
             onFilter={updateFilter}
-            onResetFilters={() => setFilters(initialFilters)}
+            onResetFilters={() => { setFilters(initialFilters); setSortMode(initialSortMode); }}
             onSelect={(review) => { setSelectedId(review.id); setActiveView("detail"); }}
+            onSort={setSortMode}
+            sortMode={sortMode}
           />
         )}
 
@@ -1287,7 +1301,7 @@ function MetricCard({ icon, label, value }) {
   return <div className="metric-card"><div className="metric-icon">{icon}</div><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, onCreateReportShare, onDuplicate = () => {}, onEdit, onExport, onFilter, onResetFilters, onSelect }) {
+function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, onCreateReportShare, onDuplicate = () => {}, onEdit, onExport, onFilter, onResetFilters, onSelect, onSort, sortMode }) {
   const archiveStats = getStats(filteredReviews);
   const filterSummary = formatReportFilters(filters);
   return (
@@ -1296,6 +1310,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
         <label className="search-box"><Search size={18} /><input aria-label="Search reviews" onChange={(event) => onFilter("query", event.target.value)} placeholder="Search client, contact, venue, notes" value={filters.query} /></label>
         <Select icon={<Filter size={16} />} label="Needs Follow-up" onChange={(value) => onFilter("status", followUpFilterToStatus(value))} options={followUpFilterOptions} value={statusToFollowUpFilter(filters.status)} />
         <Select icon={<Users size={16} />} label="Manager" onChange={(value) => onFilter("manager", value)} options={["All", ...managers]} value={filters.manager} />
+        <Select icon={<ArrowUpDown size={16} />} label="Sort" onChange={onSort} options={reviewSortOptions} value={sortMode} />
         <DateFilter label="From" onChange={(value) => onFilter("dateFrom", value)} value={filters.dateFrom} />
         <DateFilter label="To" onChange={(value) => onFilter("dateTo", value)} value={filters.dateTo} />
         <button className="secondary-button" onClick={onResetFilters} type="button"><RotateCcw size={16} />Reset</button>

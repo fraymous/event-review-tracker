@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { REVIEW_BUCKET, dbReviewToUi } from "../../../../lib/supabase-data";
-import { applyReviewFilters } from "../../../../lib/review-store";
+import { applyReviewFilters, sortReviewList } from "../../../../lib/review-store";
 import { getSupabaseAdminClient } from "../../../../lib/supabase-server";
 
 function stripInternalAttachmentPaths(review) {
@@ -87,7 +87,10 @@ export async function GET(_request, context) {
       link: normalizedLink,
       report: {
         filters: normalizedLink.filters,
-        reviews: applyReviewFilters(uiReviews, normalizedLink.filters),
+        reviews: sortReviewList(
+          applyReviewFilters(uiReviews, normalizedLink.filters),
+          normalizedLink.filters?.sortMode
+        ),
       },
     });
   }
