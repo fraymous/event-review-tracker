@@ -476,6 +476,27 @@ export default function Home() {
     setActiveView("form");
   }
 
+  function duplicateReviewDraft(review) {
+    if (effectiveRole !== "manager" || !review) return false;
+    setFormDirty(false);
+    setEditingReview({
+      ...review,
+      id: "",
+      clientName: `Copy of ${review.clientName}`,
+      eventDate: new Date().toISOString().slice(0, 10),
+      followUpStatus: "Draft",
+      followUpOwner: "",
+      followUpDueDate: "",
+      followUpNotes: "",
+      attachments: [],
+      createdAt: "",
+      updatedAt: "",
+    });
+    setActiveView("form");
+    setNotice("Draft copy created. Attachments and share links were not copied.");
+    return true;
+  }
+
   function discardReviewForm(nextView) {
     setEditingReview(null);
     setFormDirty(false);
@@ -1041,6 +1062,7 @@ export default function Home() {
             role={effectiveRole}
             onCreateShare={createShareLink}
             onCreateReportShare={createReportShareLink}
+            onDuplicate={duplicateReviewDraft}
             onEdit={startEdit}
             onExport={exportCsv}
             onFilter={updateFilter}
@@ -1057,6 +1079,7 @@ export default function Home() {
             onCreateShare={createShareLink}
             onCreateReportShare={createReportShareLink}
             onDelete={requestDeleteReview}
+            onDuplicate={duplicateReviewDraft}
             onEdit={startEdit}
             onPrint={() => window.print()}
             onSetStatus={updateReviewStatus}
@@ -1259,7 +1282,7 @@ function MetricCard({ icon, label, value }) {
   return <div className="metric-card"><div className="metric-icon">{icon}</div><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, onCreateReportShare, onEdit, onExport, onFilter, onResetFilters, onSelect }) {
+function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, onCreateReportShare, onDuplicate = () => {}, onEdit, onExport, onFilter, onResetFilters, onSelect }) {
   const archiveStats = getStats(filteredReviews);
   const filterSummary = formatReportFilters(filters);
   return (
@@ -1275,12 +1298,12 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
         {role === "manager" && <button className="secondary-button" onClick={() => onCreateReportShare()} type="button"><Share2 size={16} />Report</button>}
       </section>
       <section className="archive-summary"><div><p className="eyebrow">Current View</p><strong>{filterSummary}</strong></div><div className="archive-summary-metrics"><span>{archiveStats.total} matching</span><span>{archiveStats.openFollowUps} open</span><span>{archiveStats.attachmentCount} attachments</span><span>{archiveStats.culinaryFlagCount} culinary</span></div></section>
-      <section className="content-band archive-results"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div><MobileReviewList onCreateShare={onCreateShare} onEdit={onEdit} onSelect={onSelect} reviews={filteredReviews} role={role} />{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
+      <section className="content-band archive-results"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onDuplicate(review)} title="Duplicate" type="button"><Copy size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div><MobileReviewList onCreateShare={onCreateShare} onDuplicate={onDuplicate} onEdit={onEdit} onSelect={onSelect} reviews={filteredReviews} role={role} />{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
     </div>
   );
 }
 
-function ReviewDetail({ review, role, links, onCreateShare, onDelete = () => {}, onEdit, onPrint, onSetStatus = () => {} }) {
+function ReviewDetail({ review, role, links, onCreateShare, onDelete = () => {}, onDuplicate = () => {}, onEdit, onPrint, onSetStatus = () => {} }) {
   if (!review) {
     return (
       <section className="content-band unavailable">
@@ -1293,7 +1316,7 @@ function ReviewDetail({ review, role, links, onCreateShare, onDelete = () => {},
 
   return (
     <div className="detail-layout">
-      <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions"><StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="secondary-button danger-button" onClick={() => onDelete(review)} type="button"><Trash2 size={16} />Delete</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
+      <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions"><StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="secondary-button" onClick={() => onDuplicate(review)} type="button"><Copy size={16} />Duplicate</button><button className="secondary-button danger-button" onClick={() => onDelete(review)} type="button"><Trash2 size={16} />Delete</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
       <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><ConsumptionDetail consumption={review.consumption} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
       <section className="content-band two-column"><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><div className="people-list"><span>{isActionableFollowUp(review) ? "Needs follow-up" : "No follow-up needed"}</span><span>{hasCulinarySignal(review) ? "Culinary notes entered" : "No culinary note"}</span><span>{getConsumptionApplies(review.consumption) ? "Consumption applies" : "No consumption charge"}</span></div></div><AttachmentList attachments={review.attachments || []} /></section>
       <section className="content-band"><div className="section-heading"><h3>Shared Access</h3><span>{links.filter(isShareActive).length} active</span></div><div className="share-mini-list">{links.length === 0 && <p className="small-muted">No links created.</p>}{links.slice(0, 3).map((link) => <div className="share-mini" key={link.id}><span>{isShareActive(link) ? "Active" : "Inactive"}</span><em>Expires {formatDate(link.expiresAt.slice(0, 10))}</em></div>)}</div></section>
@@ -1306,9 +1329,10 @@ function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave }) {
   const [form, setForm] = useState(() => ({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) }));
 
   useEffect(() => {
+    setForm({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) });
     onDirtyChange(false);
     return () => onDirtyChange(false);
-  }, [onDirtyChange, review?.id]);
+  }, [onDirtyChange, review?.clientName, review?.createdAt, review?.eventDate, review?.id, review?.updatedAt]);
 
   function markDirty() {
     onDirtyChange(true);
@@ -1554,7 +1578,7 @@ function SharedReportView({ link, report, onPrint }) {
   );
 }
 
-function MobileReviewList({ onCreateShare = () => {}, onEdit = () => {}, onSelect, reviews, role }) {
+function MobileReviewList({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit = () => {}, onSelect, reviews, role }) {
   return (
     <div className="mobile-review-list">
       {reviews.map((review) => (
@@ -1569,7 +1593,7 @@ function MobileReviewList({ onCreateShare = () => {}, onEdit = () => {}, onSelec
             <span><strong>Rating</strong>{ratingLabel(review.overallRating)}</span>
           </div>
           <p>{isActionableFollowUp(review) ? followUpMeta(review) : previewText(review.summary || review.wins, 120)}</p>
-          <div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div>
+          <div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onDuplicate(review)} title="Duplicate" type="button"><Copy size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div>
         </article>
       ))}
     </div>
