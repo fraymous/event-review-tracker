@@ -999,6 +999,10 @@ button {
   padding: 7px 10px;
 }
 
+.people-list .hidden-metadata-pill {
+  display: none;
+}
+
 .sticky-actions {
   display: flex;
   justify-content: flex-end;
