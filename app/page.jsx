@@ -35,7 +35,7 @@ import {
   X,
 } from "lucide-react";
 
-import { eventTypes, seedReviews, statusOptions } from "../lib/seed-data";
+import { eventTypes, seedReviews } from "../lib/seed-data";
 import {
   applyReviewFilters,
   buildCsv,
@@ -80,6 +80,7 @@ const demoAccessUsers = [
 ];
 
 const initialFilters = { query: "", status: "All", tag: "All", manager: "All", due: "All", dateFrom: "", dateTo: "" };
+const followUpFilterOptions = ["All", "No", "Yes"];
 const shareExpiryOptions = [7, 14, 30, 60, 90];
 const backupType = "event-review-tracker-backup";
 
@@ -167,6 +168,26 @@ function isActionableFollowUp(review) {
   return review?.followUpStatus === "Needs follow-up";
 }
 
+function isNeedsFollowUpStatus(status) {
+  return status === "Needs follow-up";
+}
+
+function followUpFilterToStatus(value) {
+  if (value === "Yes") return "Needs follow-up";
+  if (value === "No") return "Draft";
+  return "All";
+}
+
+function statusToFollowUpFilter(status) {
+  if (status === "Needs follow-up") return "Yes";
+  if (status === "All") return "All";
+  return "No";
+}
+
+function followUpDisplay(status) {
+  return isNeedsFollowUpStatus(status) ? "Yes" : "No";
+}
+
 function hasCulinarySignal(review) {
   return String(review?.culinaryNotes || "").trim() || (review?.tags || []).includes("culinary");
 }
@@ -201,7 +222,7 @@ function formatReportFilters(filters = {}) {
   const normalized = { ...initialFilters, ...filters };
   const parts = [];
   if (normalized.query) parts.push(`Search: "${normalized.query}"`);
-  if (normalized.status !== "All") parts.push(`Status: ${normalized.status}`);
+  if (normalized.status !== "All") parts.push(`Needs follow-up: ${followUpDisplay(normalized.status)}`);
   if (normalized.tag !== "All") parts.push(`Tag: ${normalized.tag}`);
   if (normalized.manager !== "All") parts.push(`Manager: ${normalized.manager}`);
   if (normalized.due !== "All") parts.push(`Due: ${normalized.due}`);
@@ -1068,7 +1089,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
     <div className="view-grid">
       <section className="filter-bar">
         <label className="search-box"><Search size={18} /><input aria-label="Search reviews" onChange={(event) => onFilter("query", event.target.value)} placeholder="Search client, contact, venue, notes" value={filters.query} /></label>
-        <Select icon={<Filter size={16} />} label="Status" onChange={(value) => onFilter("status", value)} options={["All", ...statusOptions]} value={filters.status} />
+        <Select icon={<Filter size={16} />} label="Needs Follow-up" onChange={(value) => onFilter("status", followUpFilterToStatus(value))} options={followUpFilterOptions} value={statusToFollowUpFilter(filters.status)} />
         <Select icon={<Users size={16} />} label="Manager" onChange={(value) => onFilter("manager", value)} options={["All", ...managers]} value={filters.manager} />
         <DateFilter label="From" onChange={(value) => onFilter("dateFrom", value)} value={filters.dateFrom} />
         <DateFilter label="To" onChange={(value) => onFilter("dateTo", value)} value={filters.dateTo} />
@@ -1077,7 +1098,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
         {role === "manager" && <button className="secondary-button" onClick={() => onCreateReportShare()} type="button"><Share2 size={16} />Report</button>}
       </section>
       <section className="archive-summary"><div><p className="eyebrow">Current View</p><strong>{filterSummary}</strong></div><div className="archive-summary-metrics"><span>{archiveStats.total} matching</span><span>{archiveStats.openFollowUps} open</span><span>{archiveStats.attachmentCount} attachments</span><span>{archiveStats.culinaryFlagCount} culinary</span></div></section>
-      <section className="content-band"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Status</th><th>Follow-up</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div>{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
+      <section className="content-band"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div>{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
     </div>
   );
 }
@@ -1124,7 +1145,7 @@ function ReviewForm({ review, onCancel, onSave }) {
   return (
     <form className="review-form" onSubmit={submit}>
       <section className="form-section"><div className="section-heading"><h3>Event</h3><span>{form.id ? "Edit" : "New"}</span></div><div className="form-grid"><TextInput label="Date" onChange={(value) => update("eventDate", value)} required type="date" value={form.eventDate} /><TextInput label="Event / Client" onChange={(value) => update("clientName", value)} required value={form.clientName} /><TextInput label="Client Contact" onChange={(value) => update("clientContact", value)} value={form.clientContact || ""} /><TextInput label="Venue / Location" onChange={(value) => update("venue", value)} required value={form.venue} /><SelectInput label="Event Type" onChange={(value) => update("eventType", value)} options={eventTypes} value={form.eventType} /><TextInput label="Manager" onChange={(value) => update("managerName", value)} required value={form.managerName} /></div></section>
-      <section className="form-section"><div className="section-heading"><h3>Review</h3><span>Rating required</span></div><div className="form-grid"><SelectInput label="Overall Rating" onChange={(value) => update("overallRating", value)} options={["", "1", "2", "3", "4", "5"]} renderOption={(value) => (value ? `${value}/5` : "Select rating")} required value={String(form.overallRating ?? "")} /><SelectInput label="Needs Follow-up" onChange={setNeedsFollowUp} options={["No", "Yes"]} value={needsFollowUp ? "Yes" : "No"} /></div>{needsFollowUp && <TextArea label="Follow-up Notes" onChange={(value) => update("followUpNotes", value)} value={form.followUpNotes || ""} />}<TextArea label="Event Summary" onChange={(value) => update("summary", value)} value={form.summary} /><TextArea label="Food / Culinary Notes" onChange={(value) => update("culinaryNotes", value)} value={form.culinaryNotes} /><TextArea label="Operational Notes" onChange={(value) => update("operationalNotes", value)} value={form.operationalNotes} /><TextArea label="Client Feedback" onChange={(value) => update("clientFeedback", value)} value={form.clientFeedback} /><div className="form-grid"><TextArea label="Wins" onChange={(value) => update("wins", value)} value={form.wins} /><TextArea label="Issues" onChange={(value) => update("issues", value)} value={form.issues} /></div></section>
+      <section className="form-section"><div className="section-heading"><h3>Review</h3><span>Rating required</span></div><div className="form-grid"><SelectInput label="Overall Rating" onChange={(value) => update("overallRating", value)} options={["", "1", "2", "3", "4", "5"]} renderOption={(value) => (value ? `${value}/5` : "Select rating")} required value={String(form.overallRating ?? "")} /><SelectInput label="Needs Follow-up" onChange={setNeedsFollowUp} options={["No", "Yes"]} value={needsFollowUp ? "Yes" : "No"} /></div>{needsFollowUp && <TextArea label="Follow-up Notes" onChange={(value) => update("followUpNotes", value)} required value={form.followUpNotes || ""} />}<TextArea label="Event Summary" onChange={(value) => update("summary", value)} value={form.summary} /><TextArea label="Food / Culinary Notes" onChange={(value) => update("culinaryNotes", value)} value={form.culinaryNotes} /><TextArea label="Operational Notes" onChange={(value) => update("operationalNotes", value)} value={form.operationalNotes} /><TextArea label="Client Feedback" onChange={(value) => update("clientFeedback", value)} value={form.clientFeedback} /><div className="form-grid"><TextArea label="Wins" onChange={(value) => update("wins", value)} value={form.wins} /><TextArea label="Issues" onChange={(value) => update("issues", value)} value={form.issues} /></div></section>
       <section className="form-section"><div className="section-heading"><h3>Files</h3><span>{form.attachments.length} attachments</span></div><label className="upload-box"><Upload size={20} /><span>Attach PDFs or photos</span><input accept=".pdf,image/*" multiple onChange={(event) => addAttachments(event.target.files)} type="file" /></label><div className="attachment-editor">{form.attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}<span>{attachment.name}</span><em>{formatFileSize(attachment.size)}{attachment.isPendingUpload ? " pending" : ""}</em><button type="button" onClick={() => removeAttachment(attachment.id)} title="Remove"><X size={16} /></button></div>)}</div></section>
       <div className="form-actions"><button className="secondary-button" onClick={onCancel} type="button"><X size={16} />Cancel</button><button className="primary-button" type="submit"><Save size={16} />Save Review</button></div>
     </form>
@@ -1268,7 +1289,7 @@ function SharedReportView({ link, report, onPrint }) {
       <section className="content-band">
         <div className="section-heading"><h3>Shared Report</h3><span>Expires {formatDate(link.expiresAt.slice(0, 10))}</span></div>
         <div className="report-filter-summary"><Filter size={16} /><span>{formatReportFilters(report?.filters)}</span></div>
-        <div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Status</th><th>Follow-up</th></tr></thead><tbody>{reviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => setSelectedReview(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td></tr>)}</tbody></table></div>
+        <div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th></tr></thead><tbody>{reviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => setSelectedReview(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td></tr>)}</tbody></table></div>
         {reviews.length === 0 && <EmptyState title="No reviews in this report" />}
       </section>
       <div className="sticky-actions"><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button></div>
@@ -1292,7 +1313,7 @@ function AttachmentList({ attachments }) {
 }
 
 function StatusPill({ status }) {
-  const displayStatus = status === "Needs follow-up" ? "Needs follow-up" : "Draft";
+  const displayStatus = isNeedsFollowUpStatus(status) ? "Needs follow-up" : "No follow-up";
   const key = displayStatus.toLowerCase().replaceAll(" ", "-");
   return <span className={`status-pill ${key}`}>{displayStatus}</span>;
 }
@@ -1321,6 +1342,6 @@ function SelectInput({ disabled = false, label, onChange, options, renderOption,
   return <label className="field"><span>{label}</span><select disabled={disabled} onChange={(event) => onChange(event.target.value)} required={required} value={value}>{options.map((option) => <option key={option || "blank"} value={option}>{renderOption ? renderOption(option) : option}</option>)}</select></label>;
 }
 
-function TextArea({ label, onChange, value }) {
-  return <label className="field field-wide"><span>{label}</span><textarea onChange={(event) => onChange(event.target.value)} rows={4} value={value} /></label>;
+function TextArea({ label, onChange, required = false, value }) {
+  return <label className="field field-wide"><span>{label}</span><textarea onChange={(event) => onChange(event.target.value)} required={required} rows={4} value={value} /></label>;
 }

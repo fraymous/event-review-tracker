@@ -794,7 +794,7 @@ button {
   white-space: nowrap;
 }
 
-.status-pill.draft {
+.status-pill.no-follow-up {
   background: #eef2f7;
   color: #475569;
 }
@@ -802,45 +802,6 @@ button {
 .status-pill.needs-follow-up {
   background: #fff3d6;
   color: var(--amber);
-}
-
-.status-pill.reviewed {
-  background: #e8f6ef;
-  color: var(--green);
-}
-
-.status-pill.closed {
-  background: #e8eef8;
-  color: #1e40af;
-}
-
-.due-pill {
-  border-radius: 999px;
-  display: inline-flex;
-  font-size: 0.76rem;
-  font-weight: 900;
-  padding: 6px 9px;
-  white-space: nowrap;
-}
-
-.due-pill.overdue {
-  background: #ffe4e6;
-  color: var(--rose);
-}
-
-.due-pill.today {
-  background: #fff3d6;
-  color: var(--amber);
-}
-
-.due-pill.upcoming {
-  background: #eff6ff;
-  color: var(--blue);
-}
-
-.due-pill.unscheduled {
-  background: #eef2f7;
-  color: #475569;
 }
 
 .follow-up-cell {
