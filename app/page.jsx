@@ -578,12 +578,13 @@ export default function Home() {
         setFormDirty(false);
         setActiveView("detail");
         setNotice(consumptionPendingMigration ? "Review saved. Run the Supabase consumption migration to persist consumption counts." : existing ? "Review updated." : "Review created.");
+        return true;
       } catch (error) {
         setErrorNotice(error.message);
+        return false;
       } finally {
         setRemoteLoading(false);
       }
-      return;
     }
 
     const normalized = normalizeReview(form, existing);
@@ -593,6 +594,7 @@ export default function Home() {
     setFormDirty(false);
     setActiveView("detail");
     setNotice(existing ? "Review updated." : "Review created.");
+    return true;
   }
 
   async function updateReviewStatus(reviewId, followUpStatus) {
@@ -1092,6 +1094,7 @@ export default function Home() {
             onCancel={requestCancelReviewForm}
             onDirtyChange={setFormDirty}
             onSave={saveReview}
+            saving={remoteLoading}
           />
         )}
 
@@ -1325,11 +1328,14 @@ function ReviewDetail({ review, role, links, onCreateShare, onDelete = () => {},
   );
 }
 
-function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave }) {
+function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave, saving = false }) {
   const [form, setForm] = useState(() => ({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) }));
+  const [submitting, setSubmitting] = useState(false);
+  const savingState = saving || submitting;
 
   useEffect(() => {
     setForm({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) });
+    setSubmitting(false);
     onDirtyChange(false);
     return () => onDirtyChange(false);
   }, [onDirtyChange, review?.clientName, review?.createdAt, review?.eventDate, review?.id, review?.updatedAt]);
@@ -1380,15 +1386,25 @@ function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave }) {
     markDirty();
     setForm((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }));
   }
-  function submit(event) { event.preventDefault(); onSave(form); }
+  async function submit(event) {
+    event.preventDefault();
+    if (savingState) return;
+    setSubmitting(true);
+    try {
+      const saved = await onSave(form);
+      if (!saved) setSubmitting(false);
+    } catch {
+      setSubmitting(false);
+    }
+  }
   const needsFollowUp = form.followUpStatus === "Needs follow-up";
   return (
-    <form className="review-form" onSubmit={submit}>
+    <form aria-busy={savingState} className="review-form" onSubmit={submit}>
       <section className="form-section"><div className="section-heading"><h3>Event</h3><span>{form.id ? "Edit" : "New"}</span></div><div className="form-grid"><TextInput label="Date" onChange={(value) => update("eventDate", value)} required type="date" value={form.eventDate} /><TextInput label="Event / Client" onChange={(value) => update("clientName", value)} required value={form.clientName} /><TextInput label="Client Contact" onChange={(value) => update("clientContact", value)} value={form.clientContact || ""} /><TextInput label="Venue / Location" onChange={(value) => update("venue", value)} required value={form.venue} /><SelectInput label="Event Type" onChange={(value) => update("eventType", value)} options={eventTypes} value={form.eventType} /><TextInput label="Manager" onChange={(value) => update("managerName", value)} required value={form.managerName} /></div></section>
       <section className="form-section"><div className="section-heading"><h3>Review</h3><span>Rating required</span></div><div className="form-grid"><SelectInput label="Overall Rating" onChange={(value) => update("overallRating", value)} options={["", "1", "2", "3", "4", "5"]} renderOption={(value) => (value ? `${value}/5` : "Select rating")} required value={String(form.overallRating ?? "")} /><SelectInput label="Needs Follow-up" onChange={setNeedsFollowUp} options={["No", "Yes"]} value={needsFollowUp ? "Yes" : "No"} /></div>{needsFollowUp && <TextArea label="Follow-up Notes" onChange={(value) => update("followUpNotes", value)} required value={form.followUpNotes || ""} />}<TextArea label="Event Summary" onChange={(value) => update("summary", value)} value={form.summary} /><TextArea label="Food / Culinary Notes" onChange={(value) => update("culinaryNotes", value)} value={form.culinaryNotes} /><TextArea label="Operational Notes" onChange={(value) => update("operationalNotes", value)} value={form.operationalNotes} /><TextArea label="Client Feedback" onChange={(value) => update("clientFeedback", value)} value={form.clientFeedback} /><div className="form-grid"><TextArea label="Wins" onChange={(value) => update("wins", value)} value={form.wins} /><TextArea label="Issues" onChange={(value) => update("issues", value)} value={form.issues} /></div></section>
       <ConsumptionInputs consumption={form.consumption} onAppliesChange={setConsumptionApplies} onChange={updateConsumption} />
       <section className="form-section"><div className="section-heading"><h3>Files</h3><span>{form.attachments.length} attachments</span></div><label className="upload-box"><Upload size={20} /><span>Attach PDFs or photos</span><input accept=".pdf,image/*" multiple onChange={(event) => addAttachments(event.target.files)} type="file" /></label><div className="attachment-editor">{form.attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}<span>{attachment.name}</span><em>{formatFileSize(attachment.size)}{attachment.isPendingUpload ? " pending" : ""}</em><button type="button" onClick={() => removeAttachment(attachment.id)} title="Remove"><X size={16} /></button></div>)}</div></section>
-      <div className="form-actions"><button className="secondary-button" onClick={onCancel} type="button"><X size={16} />Cancel</button><button className="primary-button" type="submit"><Save size={16} />Save Review</button></div>
+      <div className="form-actions"><button className="secondary-button" disabled={savingState} onClick={onCancel} type="button"><X size={16} />Cancel</button><button className="primary-button" disabled={savingState} type="submit"><Save size={16} />{savingState ? "Saving..." : "Save Review"}</button></div>
     </form>
   );
 }
