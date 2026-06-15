@@ -266,6 +266,7 @@ export default function Home() {
   const [confirmation, setConfirmation] = useState(null);
   const [shareToken, setShareToken] = useState("");
   const [lastShareUrl, setLastShareUrl] = useState("");
+  const [formDirty, setFormDirty] = useState(false);
   const [supabaseClient, setSupabaseClient] = useState(null);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -456,14 +457,76 @@ export default function Home() {
 
   function startNewReview() {
     if (effectiveRole !== "manager") return false;
+    setFormDirty(false);
     setEditingReview(blankReview(profile?.full_name || "Michael Frazier"));
     setActiveView("form");
   }
 
   function startEdit(review) {
     if (effectiveRole !== "manager") return false;
+    setFormDirty(false);
     setEditingReview(review);
     setActiveView("form");
+  }
+
+  function discardReviewForm(nextView) {
+    setEditingReview(null);
+    setFormDirty(false);
+    setActiveView(nextView);
+  }
+
+  function closeReviewForm() {
+    discardReviewForm(selectedReview ? "detail" : "dashboard");
+  }
+
+  function requestCancelReviewForm() {
+    if (!formDirty) {
+      closeReviewForm();
+      return;
+    }
+
+    setConfirmation({
+      title: "Discard unsaved review?",
+      message: "This review has unsaved edits. Discard them and leave the form?",
+      confirmLabel: "Discard Changes",
+      tone: "warning",
+      onConfirm: closeReviewForm,
+    });
+  }
+
+  function requestViewChange(nextView) {
+    if (activeView !== "form") {
+      setActiveView(nextView);
+      return;
+    }
+
+    if (!formDirty) {
+      discardReviewForm(nextView);
+      return;
+    }
+
+    setConfirmation({
+      title: "Discard unsaved review?",
+      message: "This review has unsaved edits. Discard them and open another view?",
+      confirmLabel: "Discard Changes",
+      tone: "warning",
+      onConfirm: () => discardReviewForm(nextView),
+    });
+  }
+
+  function requestStartNewReview() {
+    if (activeView !== "form" || !formDirty) {
+      startNewReview();
+      return;
+    }
+
+    setConfirmation({
+      title: "Discard unsaved review?",
+      message: "This review has unsaved edits. Discard them and start a new review?",
+      confirmLabel: "Start New Review",
+      tone: "warning",
+      onConfirm: startNewReview,
+    });
   }
 
   async function saveReview(form) {
@@ -482,6 +545,7 @@ export default function Home() {
         await uploadRemoteAttachments(supabaseClient, saved.id, pendingAttachments, profile);
         await refreshRemoteData({ selectId: saved.id });
         setEditingReview(null);
+        setFormDirty(false);
         setActiveView("detail");
         setNotice(existing ? "Review updated." : "Review created.");
       } catch (error) {
@@ -496,6 +560,7 @@ export default function Home() {
     setReviews((current) => existing ? current.map((review) => review.id === existing.id ? normalized : review) : [normalized, ...current]);
     setSelectedId(normalized.id);
     setEditingReview(null);
+    setFormDirty(false);
     setActiveView("detail");
     setNotice(existing ? "Review updated." : "Review created.");
   }
@@ -859,11 +924,11 @@ export default function Home() {
         </div>
 
         <nav className="nav-stack" aria-label="Main navigation">
-          <NavButton active={activeView === "dashboard"} icon={<BarChart3 size={18} />} label="Dashboard" onClick={() => setActiveView("dashboard")} />
-          <NavButton active={activeView === "brief"} icon={<FileText size={18} />} label="Brief" onClick={() => setActiveView("brief")} />
-          <NavButton active={activeView === "archive"} icon={<Archive size={18} />} label="Archive" onClick={() => setActiveView("archive")} />
-          <NavButton active={activeView === "detail"} icon={<Eye size={18} />} label="Review Detail" onClick={() => setActiveView("detail")} />
-          <NavButton active={activeView === "sharing"} icon={<Share2 size={18} />} label="Sharing" onClick={() => setActiveView("sharing")} />
+          <NavButton active={activeView === "dashboard"} icon={<BarChart3 size={18} />} label="Dashboard" onClick={() => requestViewChange("dashboard")} />
+          <NavButton active={activeView === "brief"} icon={<FileText size={18} />} label="Brief" onClick={() => requestViewChange("brief")} />
+          <NavButton active={activeView === "archive"} icon={<Archive size={18} />} label="Archive" onClick={() => requestViewChange("archive")} />
+          <NavButton active={activeView === "detail"} icon={<Eye size={18} />} label="Review Detail" onClick={() => requestViewChange("detail")} />
+          <NavButton active={activeView === "sharing"} icon={<Share2 size={18} />} label="Sharing" onClick={() => requestViewChange("sharing")} />
         </nav>
 
         <div className="role-box">
@@ -886,7 +951,7 @@ export default function Home() {
         <header className="topbar">
           <div><p className="eyebrow">{roleCopy[effectiveRole].label} view</p><h2>{viewTitle(activeView)}</h2></div>
           <div className="topbar-actions">
-            {effectiveRole === "manager" && <button className="primary-button" onClick={startNewReview} type="button"><Plus size={18} />New Review</button>}
+            {effectiveRole === "manager" && <button className="primary-button" onClick={requestStartNewReview} type="button"><Plus size={18} />New Review</button>}
             <button className="icon-button" onClick={() => window.print()} title="Print" type="button"><Printer size={18} /></button>
             {remoteMode && <button className="icon-button" onClick={signOut} title="Sign out" type="button"><LogOut size={18} /></button>}
           </div>
@@ -933,7 +998,8 @@ export default function Home() {
         {activeView === "form" && effectiveRole === "manager" && (
           <ReviewForm
             review={editingReview || blankReview(profile?.full_name || "Michael Frazier")}
-            onCancel={() => { setEditingReview(null); setActiveView(selectedReview ? "detail" : "dashboard"); }}
+            onCancel={requestCancelReviewForm}
+            onDirtyChange={setFormDirty}
             onSave={saveReview}
           />
         )}
@@ -1168,10 +1234,25 @@ function ReviewDetail({ review, role, links, onCreateShare, onEdit, onPrint, onS
   );
 }
 
-function ReviewForm({ review, onCancel, onSave }) {
+function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave }) {
   const [form, setForm] = useState(() => ({ ...blankReview(), ...review }));
-  function update(key, value) { setForm((current) => ({ ...current, [key]: value })); }
+
+  useEffect(() => {
+    onDirtyChange(false);
+    return () => onDirtyChange(false);
+  }, [onDirtyChange, review?.id]);
+
+  function markDirty() {
+    onDirtyChange(true);
+  }
+
+  function update(key, value) {
+    markDirty();
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
   function setNeedsFollowUp(value) {
+    markDirty();
     setForm((current) => ({
       ...current,
       followUpStatus: value === "Yes" ? "Needs follow-up" : "Draft",
@@ -1180,9 +1261,14 @@ function ReviewForm({ review, onCancel, onSave }) {
   }
   function addAttachments(files) {
     const mapped = Array.from(files || []).map((file) => ({ id: makeId("att"), name: file.name, type: file.type || "application/octet-stream", size: file.size, uploadedAt: new Date().toISOString(), isPendingUpload: true, file }));
+    if (mapped.length === 0) return;
+    markDirty();
     setForm((current) => ({ ...current, attachments: [...current.attachments, ...mapped] }));
   }
-  function removeAttachment(id) { setForm((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) })); }
+  function removeAttachment(id) {
+    markDirty();
+    setForm((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }));
+  }
   function submit(event) { event.preventDefault(); onSave(form); }
   const needsFollowUp = form.followUpStatus === "Needs follow-up";
   return (
