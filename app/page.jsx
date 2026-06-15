@@ -256,6 +256,12 @@ function normalizeShareExpiryDays(value) {
   return shareExpiryOptions.includes(days) ? days : 30;
 }
 
+function sortShareLinks(a, b) {
+  const activeDifference = Number(isShareActive(b)) - Number(isShareActive(a));
+  if (activeDifference !== 0) return activeDifference;
+  return new Date(b.createdAt || b.expiresAt) - new Date(a.createdAt || a.expiresAt);
+}
+
 function getShareExpiryDate(days) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + normalizeShareExpiryDays(days));
@@ -1465,7 +1471,9 @@ function ConsumptionInputs({ consumption, onAppliesChange, onChange }) {
 }
 
 function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, role, remoteMode, onCopy, onCreateBriefShare, onCreateShare, onCreateReportShare, onExportBackup, onImportBackup, onInvite, onOpen, onReset, onRevoke, onShareExpiryDays, shareExpiryDays, supabaseStatus }) {
-  const activeLinks = links.filter(isShareActive);
+  const sortedLinks = [...links].sort(sortShareLinks);
+  const activeLinks = sortedLinks.filter(isShareActive);
+  const inactiveLinks = sortedLinks.filter((link) => !isShareActive(link));
   const invitesReady = Boolean(healthStatus?.features?.managerInvites);
   const consumptionStorageReady = Boolean(healthStatus?.features?.consumptionStorage);
   const inviteMetric = remoteMode ? (invitesReady ? "Ready" : "Setup") : "Local";
@@ -1473,11 +1481,41 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
   const sharingNote = remoteMode
     ? "Managers create and edit. Executives and directors view all reviews in read-only mode. Shared links expose one review, the executive brief, or a filtered report and can be revoked."
     : "Local mode is ready for personal tracking. Use PDF or CSV for outside sharing until Supabase and Vercel are connected.";
+  function renderShareRow(link) {
+    const review = reviews.find((item) => item.id === link.reviewId);
+    const isReport = link.scope === "filtered-report";
+    const isBrief = link.scope === "executive-brief";
+    const name = isBrief ? "Executive Brief" : isReport ? "Filtered Report" : review?.clientName || "Unknown review";
+    const description = isBrief ? "30-day leadership snapshot" : isReport ? formatReportFilters(link.filters) : "Single review public link";
+    const scopeClass = isBrief ? "brief" : isReport ? "report" : "review";
+    const scopeLabel = isBrief ? "Brief" : isReport ? "Report" : "Review";
+    const statusLabel = link.revokedAt ? "Revoked" : isShareActive(link) ? "Active" : "Expired";
+
+    return (
+      <div className="share-row" key={link.id}>
+        <div><strong>{name}</strong><span>{statusLabel} - Expires {formatDate(link.expiresAt.slice(0, 10))}</span><em>{description}</em></div>
+        <span className={`share-scope ${scopeClass}`}>{scopeLabel}</span>
+        <div className="row-actions">
+          <button className="icon-button" onClick={() => onOpen(link.token)} title="Open" type="button"><ExternalLink size={16} /></button>
+          <button className="icon-button" onClick={() => onCopy(link.token)} title="Copy" type="button"><Copy size={16} /></button>
+          {role === "manager" && !link.revokedAt && <button className="icon-button" onClick={() => onRevoke(link.id)} title="Revoke" type="button"><Trash2 size={16} /></button>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="view-grid">
       <section className="metric-grid"><MetricCard icon={<ShieldCheck />} label="Active links" value={activeLinks.length} /><MetricCard icon={<Eye />} label="Role access" value="Read-only" /><MetricCard icon={<Mail />} label="Manager invites" value={inviteMetric} /><MetricCard icon={<Utensils />} label="Consumption" value={consumptionMetric} /><MetricCard icon={<Lock />} label="Storage" value={remoteMode || supabaseStatus.configured ? "Cloud" : "Local"} /></section>
       {role === "manager" && remoteMode && healthStatus && !consumptionStorageReady && <section className="content-band"><div className="access-status"><AlertTriangle size={18} /><div><strong>Consumption storage needs setup</strong><span>Run the Supabase consumption migration before relying on saved consumption choices or counts.</span></div></div></section>}
-      <section className="content-band"><div className="section-heading"><h3>Review Links</h3><span>Custom expiration</span></div><div className="share-list">{links.length === 0 && <EmptyState title="No share links yet" />}{links.map((link) => { const review = reviews.find((item) => item.id === link.reviewId); const isReport = link.scope === "filtered-report"; const isBrief = link.scope === "executive-brief"; const name = isBrief ? "Executive Brief" : isReport ? "Filtered Report" : review?.clientName || "Unknown review"; const description = isBrief ? "30-day leadership snapshot" : isReport ? formatReportFilters(link.filters) : "Single review public link"; const scopeClass = isBrief ? "brief" : isReport ? "report" : "review"; const scopeLabel = isBrief ? "Brief" : isReport ? "Report" : "Review"; return <div className="share-row" key={link.id}><div><strong>{name}</strong><span>{isShareActive(link) ? "Active" : "Inactive"} - Expires {formatDate(link.expiresAt.slice(0, 10))}</span><em>{description}</em></div><span className={`share-scope ${scopeClass}`}>{scopeLabel}</span><div className="row-actions"><button className="icon-button" onClick={() => onOpen(link.token)} title="Open" type="button"><ExternalLink size={16} /></button><button className="icon-button" onClick={() => onCopy(link.token)} title="Copy" type="button"><Copy size={16} /></button>{role === "manager" && !link.revokedAt && <button className="icon-button" onClick={() => onRevoke(link.id)} title="Revoke" type="button"><Trash2 size={16} /></button>}</div></div>; })}</div></section>
+      <section className="content-band">
+        <div className="section-heading"><h3>Review Links</h3><span>{activeLinks.length} active</span></div>
+        <div className="share-list">
+          {sortedLinks.length === 0 && <EmptyState title="No share links yet" />}
+          {activeLinks.map(renderShareRow)}
+          {inactiveLinks.length > 0 && <div className="share-group-label">Expired or revoked</div>}
+          {inactiveLinks.map(renderShareRow)}
+        </div>
+      </section>
       {lastShareUrl && <section className="content-band"><div className="section-heading"><h3>Last Share URL</h3><span>Copy fallback</span></div><label className="share-url-box"><LinkIcon size={16} /><input onFocus={(event) => event.target.select()} readOnly value={lastShareUrl} /></label></section>}
       {role === "manager" && <section className="content-band"><div className="section-heading"><h3>Create Link</h3><span>Expires in {shareExpiryDays} days</span></div><div className="share-controls"><SelectInput label="Link Expires" onChange={(value) => onShareExpiryDays(normalizeShareExpiryDays(value))} options={shareExpiryOptions.map(String)} renderOption={(value) => `${value} days`} value={String(shareExpiryDays)} /></div><div className="quick-share-grid"><button className="quick-share" onClick={onCreateBriefShare} type="button"><span>Executive Brief</span><FileText size={16} /></button><button className="quick-share" onClick={onCreateReportShare} type="button"><span>All Reviews Report</span><Share2 size={16} /></button>{reviews.slice(0, 6).map((review) => <button className="quick-share" key={review.id} onClick={() => onCreateShare(review)} type="button"><span>{review.clientName}</span><LinkIcon size={16} /></button>)}</div></section>}
       <section className="content-band">

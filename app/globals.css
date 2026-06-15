@@ -522,6 +522,14 @@ button {
   font-style: normal;
 }
 
+.share-group-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 10px 2px 2px;
+  text-transform: uppercase;
+}
+
 .share-scope {
   border-radius: 999px;
   flex: 0 0 auto;
