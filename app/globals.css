@@ -776,6 +776,57 @@ button {
   text-transform: uppercase;
 }
 
+.mobile-review-list {
+  display: none;
+}
+
+.mobile-review-card {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.mobile-review-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.mobile-review-meta,
+.mobile-review-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mobile-review-meta span,
+.mobile-review-fields span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.mobile-review-fields span {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 9px;
+}
+
+.mobile-review-fields strong {
+  color: #334155;
+  margin-right: 5px;
+}
+
+.mobile-review-card p {
+  color: #334155;
+  line-height: 1.45;
+  margin: 0;
+}
+
 .link-button {
   background: transparent;
   border: 0;
@@ -1196,6 +1247,16 @@ button {
   .access-user {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .archive-results .table-wrap,
+  .shared-shell .table-wrap {
+    display: none;
+  }
+
+  .mobile-review-list {
+    display: grid;
+    gap: 10px;
   }
 
   .share-row .row-actions {

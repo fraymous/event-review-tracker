@@ -1106,7 +1106,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
         {role === "manager" && <button className="secondary-button" onClick={() => onCreateReportShare()} type="button"><Share2 size={16} />Report</button>}
       </section>
       <section className="archive-summary"><div><p className="eyebrow">Current View</p><strong>{filterSummary}</strong></div><div className="archive-summary-metrics"><span>{archiveStats.total} matching</span><span>{archiveStats.openFollowUps} open</span><span>{archiveStats.attachmentCount} attachments</span><span>{archiveStats.culinaryFlagCount} culinary</span></div></section>
-      <section className="content-band"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div>{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
+      <section className="content-band archive-results"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div><MobileReviewList onCreateShare={onCreateShare} onEdit={onEdit} onSelect={onSelect} reviews={filteredReviews} role={role} />{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
     </div>
   );
 }
@@ -1298,12 +1298,36 @@ function SharedReportView({ link, report, onPrint }) {
         <div className="section-heading"><h3>Shared Report</h3><span>Expires {formatDate(link.expiresAt.slice(0, 10))}</span></div>
         <div className="report-filter-summary"><Filter size={16} /><span>{formatReportFilters(report?.filters)}</span></div>
         <div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th></tr></thead><tbody>{reviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => setSelectedReview(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td></tr>)}</tbody></table></div>
+        <MobileReviewList onSelect={setSelectedReview} reviews={reviews} role="leadership" />
         {reviews.length === 0 && <EmptyState title="No reviews in this report" />}
       </section>
       <div className="sticky-actions"><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button></div>
     </div>
   );
 }
+
+function MobileReviewList({ onCreateShare = () => {}, onEdit = () => {}, onSelect, reviews, role }) {
+  return (
+    <div className="mobile-review-list">
+      {reviews.map((review) => (
+        <article className="mobile-review-card" key={review.id}>
+          <div className="mobile-review-card-header">
+            <button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button>
+            <StatusPill status={review.followUpStatus} />
+          </div>
+          <div className="mobile-review-meta"><span>{formatDate(review.eventDate)}</span><span>{review.venue}</span><span>{review.managerName}</span></div>
+          <div className="mobile-review-fields">
+            <span><strong>Contact</strong>{review.clientContact || "N/A"}</span>
+            <span><strong>Rating</strong>{ratingLabel(review.overallRating)}</span>
+          </div>
+          <p>{isActionableFollowUp(review) ? followUpMeta(review) : previewText(review.summary || review.wins, 120)}</p>
+          <div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function DetailBlock({ icon, title, value, tone }) {
   return <article className={`detail-block ${tone || ""}`}><div className="detail-block-title">{icon}<h4>{title}</h4></div><p>{value || "N/A"}</p></article>;
 }
