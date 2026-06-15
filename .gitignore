@@ -2,6 +2,7 @@ node_modules
 .next
 out
 .vercel
+.tools
 .env*.local
 *.log
 verification-*.png
