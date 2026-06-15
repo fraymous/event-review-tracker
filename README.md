@@ -34,7 +34,7 @@ Open the local URL printed by Next.js.
 3. Create `.env.local` from `.env.example`.
 4. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 5. Add `SUPABASE_SERVICE_ROLE_KEY` as a server-only variable so public share links and manager invites can run.
-6. Leave `NEXT_PUBLIC_ALLOW_SIGN_UP=true` for the first manager account, then set it to `false` once manager invites are ready.
+6. Leave `NEXT_PUBLIC_ALLOW_SIGN_UP=true` for bootstrap. With `SUPABASE_SERVICE_ROLE_KEY` configured, the app automatically hides first-manager sign-up after a profile exists. You can still set it to `false` later for stricter lock-down.
 7. Add the deployed app URL to Supabase Auth redirect URLs so invited users return to the review tracker after accepting an invite.
 
 The current app runs with browser local storage when Supabase keys are missing. That makes the prototype easy to try immediately, but real multi-user leadership access needs Supabase connected.
@@ -69,13 +69,13 @@ When `.env.local` contains Supabase keys, the app switches from local demo stora
 - Executives/directors can read all reviews when their `profiles.role` is set to `leadership`
 - Attachments upload to the private `review-attachments` bucket
 - Shared review links are read through `/api/shared-review/[token]` using `SUPABASE_SERVICE_ROLE_KEY`
-- Set `NEXT_PUBLIC_ALLOW_SIGN_UP=false` after the first manager exists if you want all future users to come through manager invites
+- First-manager sign-up automatically closes after a profile exists when `SUPABASE_SERVICE_ROLE_KEY` is configured; set `NEXT_PUBLIC_ALLOW_SIGN_UP=false` later if you want the environment to block bootstrap sign-up entirely
 
 For v1, managers can invite leadership users through the invite route once `SUPABASE_SERVICE_ROLE_KEY` is configured. Manual profile updates in Supabase are still available as a fallback.
 
 ## Deployment readiness check
 
-After deploying or running locally, visit `/api/health`. It returns whether the app is running in local-demo mode or Supabase-backed mode, whether first-manager sign-up is open, and whether public shared links and manager invites are ready.
+After deploying or running locally, visit `/api/health`. It returns whether the app is running in local-demo mode or Supabase-backed mode, whether first-manager sign-up is currently available, and whether public shared links and manager invites are ready.
 
 ## Manager invites
 

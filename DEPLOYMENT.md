@@ -28,18 +28,19 @@ Keep `SUPABASE_SERVICE_ROLE_KEY` server-only.
 2. Create the first manager account from the app.
 3. Complete workspace profile setup.
 4. Invite leadership/director users from Sharing & Access.
-5. Change `NEXT_PUBLIC_ALLOW_SIGN_UP=false`.
-6. Redeploy so future users enter through invites.
+5. Confirm `/api/health` shows `firstManagerSignup: false` after the profile exists.
+6. Optional hardening: change `NEXT_PUBLIC_ALLOW_SIGN_UP=false` and redeploy so bootstrap sign-up is disabled at the environment level too.
 
 ## 4. Smoke Test
 
 1. Visit `/api/health`.
 2. Confirm `storageMode` is `supabase`.
 3. Confirm `publicSharedLinks` and `managerInvites` are `true`.
-4. Create one review with culinary notes and a follow-up owner/due date.
-5. Confirm the dashboard and archive call out overdue follow-ups when due dates have passed.
-6. Upload one attachment.
-7. Create an executive brief share link and open it in a private browser.
-8. Create a single-review share link and open it in a private browser.
-9. Create a filtered report link with a date range and open it in a private browser.
-10. Sign in as a leadership user and confirm read-only access.
+4. Confirm `firstManagerSignup` is `false` after the first manager profile exists.
+5. Create one review with culinary notes and follow-up notes.
+6. Confirm the dashboard and archive call out reviews that need follow-up.
+7. Upload one attachment.
+8. Create an executive brief share link and open it in a private browser.
+9. Create a single-review share link and open it in a private browser.
+10. Create a filtered report link with a date range and open it in a private browser.
+11. Sign in as a leadership user and confirm read-only access.

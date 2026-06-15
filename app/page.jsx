@@ -278,7 +278,8 @@ export default function Home() {
   const [healthStatus, setHealthStatus] = useState(null);
   const supabaseStatus = getSupabaseStatus();
   const remoteMode = Boolean(supabaseClient);
-  const allowSignUp = process.env.NEXT_PUBLIC_ALLOW_SIGN_UP !== "false";
+  const envAllowsSignUp = process.env.NEXT_PUBLIC_ALLOW_SIGN_UP !== "false";
+  const allowSignUp = envAllowsSignUp && (!remoteMode || healthStatus?.features?.firstManagerSignup === true);
   const effectiveRole = remoteMode ? profile?.role || "manager" : role;
 
   useEffect(() => {
@@ -331,6 +332,10 @@ export default function Home() {
     }, 4200);
     return () => window.clearTimeout(timer);
   }, [notice, errorNotice]);
+
+  useEffect(() => {
+    if (!allowSignUp && authMode === "sign-up") setAuthMode("sign-in");
+  }, [allowSignUp, authMode]);
 
   useEffect(() => {
     if (!remoteMode || !supabaseClient) return;
