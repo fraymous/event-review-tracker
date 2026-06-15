@@ -48,6 +48,7 @@ Before Supabase is connected, use Sharing & Access > Data Backup to download a J
 - Follow-up is a simple yes/no flag in V1. When set to yes, managers add follow-up notes.
 - Shared links expose one review, the executive brief, or a filtered report and can be revoked or expired.
 - The Access Directory shows role-based users in the organization; public share links remain separate from account access.
+- Signed-in users without a profile see access pending after bootstrap; they need a manager invite instead of creating a separate workspace.
 
 ## Scoring stance
 

@@ -279,6 +279,7 @@ export default function Home() {
   const supabaseStatus = getSupabaseStatus();
   const remoteMode = Boolean(supabaseClient);
   const envAllowsSignUp = process.env.NEXT_PUBLIC_ALLOW_SIGN_UP !== "false";
+  const accessCheckPending = remoteMode && envAllowsSignUp && !healthStatus;
   const allowSignUp = envAllowsSignUp && (!remoteMode || healthStatus?.features?.firstManagerSignup === true);
   const effectiveRole = remoteMode ? profile?.role || "manager" : role;
 
@@ -414,6 +415,10 @@ export default function Home() {
   async function submitProfileSetup(event) {
     event.preventDefault();
     if (!supabaseClient) return;
+    if (!allowSignUp) {
+      setErrorNotice("Workspace setup is closed. Ask a manager to invite this email address.");
+      return;
+    }
     setAuthLoading(true);
     setErrorNotice("");
     try {
@@ -821,6 +826,17 @@ export default function Home() {
   }
 
   if (remoteMode && session && !profile && !remoteLoading) {
+    if (!allowSignUp) {
+      return (
+        <AccessPendingShell
+          checking={accessCheckPending}
+          errorNotice={errorNotice}
+          notice={notice}
+          onSignOut={signOut}
+        />
+      );
+    }
+
     return (
       <SetupShell
         errorNotice={errorNotice}
@@ -1016,6 +1032,20 @@ function AuthShell({ allowSignUp, authForm, authLoading, authMode, errorNotice, 
           <button className="primary-button" disabled={authLoading} type="submit">{authLoading ? "Working..." : isSignUp ? "Create Account" : "Sign In"}</button>
         </form>
         {allowSignUp && <button className="text-button" onClick={() => onAuthMode(isSignUp ? "sign-in" : "sign-up")} type="button">{isSignUp ? "Use an existing account" : "Create the first manager account"}</button>}
+      </section>
+    </main>
+  );
+}
+
+function AccessPendingShell({ checking = false, errorNotice, notice, onSignOut }) {
+  return (
+    <main className="auth-shell">
+      <section className="auth-panel">
+        <div className="brand-block auth-brand"><div className="brand-mark"><ShieldCheck size={22} /></div><div><p className="eyebrow">Access</p><h1>{checking ? "Checking Access" : "Access Pending"}</h1></div></div>
+        <p>{checking ? "Checking whether workspace setup is still available." : "This account does not have a review tracker profile yet. Ask a manager to invite this email address, then sign in again from the invite link."}</p>
+        {notice && <Notice tone="success" text={notice} />}
+        {errorNotice && <Notice tone="error" text={errorNotice} />}
+        <button className="secondary-button" onClick={onSignOut} type="button"><LogOut size={16} />Sign Out</button>
       </section>
     </main>
   );
