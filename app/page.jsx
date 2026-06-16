@@ -1204,6 +1204,7 @@ function getStats(reviews) {
   const openFollowUps = reviews.filter(isActionableFollowUp).length;
   const attachmentCount = reviews.reduce((total, review) => total + (review.attachments || []).length, 0);
   const culinaryFlagCount = reviews.filter(hasCulinarySignal).length;
+  const consumptionCount = reviews.filter((review) => getConsumptionApplies(review.consumption)).length;
   const months = reviews.reduce((acc, review) => {
     const key = review.eventDate.slice(0, 7);
     if (!acc[key]) acc[key] = { label: key, count: 0, ratingCount: 0 };
@@ -1218,6 +1219,7 @@ function getStats(reviews) {
     openFollowUps,
     attachmentCount,
     culinaryFlagCount,
+    consumptionCount,
     monthlyTrend: Object.values(months).sort((a, b) => a.label.localeCompare(b.label)).slice(-6),
   };
 }
@@ -1305,10 +1307,10 @@ function Dashboard({ stats, reviews, role, onSelect }) {
   const maxTrendCount = Math.max(1, ...stats.monthlyTrend.map((item) => item.count));
   return (
     <div className="view-grid">
-      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Events" value={stats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={stats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={stats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={stats.culinaryFlagCount} /></section>
+      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Events" value={stats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={stats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={stats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={stats.culinaryFlagCount} /><MetricCard icon={<ClipboardList />} label="Consumption" value={stats.consumptionCount} /></section>
       <section className="content-band two-column">
         <div><div className="section-heading"><h3>Recent Reviews</h3><span>{role === "leadership" ? "Read-only" : "Manager entry"}</span></div><div className="review-list">{recent.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{formatDate(review.eventDate)} - {review.venue}</span></div><StatusPill status={review.followUpStatus} /></button>)}{recent.length === 0 && <EmptyState title="No reviews yet" />}</div></div>
-        <div><div className="section-heading"><h3>Review Signals</h3><span>Current view</span></div><div className="tag-counts"><div className="tag-count"><span>Rated reviews</span><strong>{reviews.filter((review) => review.overallRating).length}</strong></div><div className="tag-count"><span>Attachments</span><strong>{stats.attachmentCount}</strong></div><div className="tag-count"><span>Needs follow-up</span><strong>{stats.openFollowUps}</strong></div></div></div>
+        <div><div className="section-heading"><h3>Review Signals</h3><span>Current view</span></div><div className="tag-counts"><div className="tag-count"><span>Rated reviews</span><strong>{reviews.filter((review) => review.overallRating).length}</strong></div><div className="tag-count"><span>Attachments</span><strong>{stats.attachmentCount}</strong></div><div className="tag-count"><span>Needs follow-up</span><strong>{stats.openFollowUps}</strong></div><div className="tag-count"><span>Consumption</span><strong>{stats.consumptionCount}</strong></div></div></div>
       </section>
       <section className="content-band two-column">
         <div><div className="section-heading"><h3>Follow-up Queue</h3><span>{followUps.length} shown</span></div><div className="review-list">{followUps.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{followUpQueueText(review)}</span></div><div className="queue-pills"><StatusPill status={review.followUpStatus} /></div></button>)}{followUps.length === 0 && <p className="small-muted">No open follow-ups.</p>}</div></div>
@@ -1329,10 +1331,10 @@ function ExecutiveBrief({ reviews, onSelect, showPrintButton = true }) {
   return (
     <div className="view-grid executive-brief">
       <section className="brief-hero">
-        <div><p className="eyebrow">Last 30 days</p><h3>{briefStats.total} events reviewed</h3><span>{briefStats.openFollowUps} open follow-ups | {briefStats.attachmentCount} attachments | {briefStats.culinaryFlagCount} culinary notes</span></div>
+        <div><p className="eyebrow">Last 30 days</p><h3>{briefStats.total} events reviewed</h3><span>{briefStats.openFollowUps} open follow-ups | {briefStats.attachmentCount} attachments | {briefStats.culinaryFlagCount} culinary notes | {briefStats.consumptionCount} consumption</span></div>
         {showPrintButton && <button className="secondary-button" onClick={() => window.print()} type="button"><Printer size={16} />PDF</button>}
       </section>
-      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Recent events" value={briefStats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={briefStats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={briefStats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={briefStats.culinaryFlagCount} /></section>
+      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Recent events" value={briefStats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={briefStats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={briefStats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={briefStats.culinaryFlagCount} /><MetricCard icon={<ClipboardList />} label="Consumption" value={briefStats.consumptionCount} /></section>
       <section className="content-band two-column">
         <div><div className="section-heading"><h3>Attention Items</h3><span>{attentionItems.length} active</span></div><div className="brief-list">{attentionItems.map((review) => <button className="brief-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{followUpMeta(review)}</span><p>{previewText(review.issues || review.operationalNotes)}</p></div><StatusPill status={review.followUpStatus} /></button>)}{attentionItems.length === 0 && <p className="small-muted">No open follow-ups.</p>}</div></div>
         <div><div className="section-heading"><h3>Culinary Watchlist</h3><span>{culinaryItems.length} noted</span></div><div className="brief-list">{culinaryItems.map((review) => <button className="brief-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{formatDate(review.eventDate)} | {review.venue}</span><p>{previewText(review.culinaryNotes)}</p></div><StatusPill status={review.followUpStatus} /></button>)}{culinaryItems.length === 0 && <p className="small-muted">No culinary notes in the last 30 days.</p>}</div></div>
@@ -1365,7 +1367,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
         <button className="secondary-button" onClick={onExport} type="button"><Download size={16} />CSV</button>
         {role === "manager" && <button className="secondary-button" onClick={() => onCreateReportShare()} type="button"><Share2 size={16} />Report</button>}
       </section>
-      <section className="archive-summary"><div><p className="eyebrow">Current View</p><strong>{filterSummary}</strong></div><div className="archive-summary-metrics"><span>{archiveStats.total} matching</span><span>{archiveStats.openFollowUps} open</span><span>{archiveStats.attachmentCount} attachments</span><span>{archiveStats.culinaryFlagCount} culinary</span></div></section>
+      <section className="archive-summary"><div><p className="eyebrow">Current View</p><strong>{filterSummary}</strong></div><div className="archive-summary-metrics"><span>{archiveStats.total} matching</span><span>{archiveStats.openFollowUps} open</span><span>{archiveStats.attachmentCount} attachments</span><span>{archiveStats.culinaryFlagCount} culinary</span><span>{archiveStats.consumptionCount} consumption</span></div></section>
       <section className="content-band archive-results"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onDuplicate(review)} title="Duplicate" type="button"><Copy size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div><MobileReviewList onCreateShare={onCreateShare} onDuplicate={onDuplicate} onEdit={onEdit} onSelect={onSelect} reviews={filteredReviews} role={role} />{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
     </div>
   );
@@ -1710,7 +1712,7 @@ function SharedReportView({ link, report, onPrint }) {
 
   return (
     <div className="view-grid">
-      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Events" value={stats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={stats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={stats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={stats.culinaryFlagCount} /></section>
+      <section className="metric-grid"><MetricCard icon={<CalendarDays />} label="Events" value={stats.total} /><MetricCard icon={<ClipboardList />} label="Open follow-ups" value={stats.openFollowUps} /><MetricCard icon={<FileText />} label="Attachments" value={stats.attachmentCount} /><MetricCard icon={<Utensils />} label="Culinary notes" value={stats.culinaryFlagCount} /><MetricCard icon={<ClipboardList />} label="Consumption" value={stats.consumptionCount} /></section>
       <section className="content-band">
         <div className="section-heading"><h3>Shared Report</h3><span>Expires {formatDate(link.expiresAt.slice(0, 10))}</span></div>
         <div className="report-filter-summary"><Filter size={16} /><span>{formatReportFilters(report?.filters)}</span></div>
