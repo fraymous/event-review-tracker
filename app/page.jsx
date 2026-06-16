@@ -25,6 +25,7 @@ import {
   Pencil,
   Plus,
   Printer,
+  RefreshCw,
   RotateCcw,
   Save,
   Search,
@@ -385,7 +386,7 @@ export default function Home() {
   }, [remoteMode, shareToken]);
 
   async function refreshRemoteData(options = {}) {
-    if (!supabaseClient) return;
+    if (!supabaseClient) return false;
     setRemoteLoading(true);
     setErrorNotice("");
     try {
@@ -395,7 +396,7 @@ export default function Home() {
         setReviews([]);
         setShareLinks([]);
         setAccessUsers([]);
-        return;
+        return false;
       }
       setRole(currentProfile.role === "leadership" ? "leadership" : "manager");
       const [remoteReviews, remoteLinks, remoteProfiles] = await Promise.all([
@@ -406,12 +407,22 @@ export default function Home() {
       setReviews(remoteReviews);
       setShareLinks(remoteLinks);
       setAccessUsers(remoteProfiles);
-      setSelectedId(options.selectId || remoteReviews[0]?.id || "");
+      const requestedId = options.selectId || selectedId;
+      const nextSelectedId = requestedId && remoteReviews.some((review) => review.id === requestedId) ? requestedId : remoteReviews[0]?.id || "";
+      setSelectedId(nextSelectedId);
+      return true;
     } catch (error) {
       setErrorNotice(error.message);
+      return false;
     } finally {
       setRemoteLoading(false);
     }
+  }
+
+  async function refreshCloudData() {
+    if (!remoteMode || !session || remoteLoading) return;
+    const refreshed = await refreshRemoteData({ selectId: selectedId });
+    if (refreshed) setNotice("Cloud data refreshed.");
   }
 
   async function submitAuth(event) {
@@ -1088,6 +1099,7 @@ export default function Home() {
           <div><p className="eyebrow">{roleCopy[effectiveRole].label} view</p><h2>{viewTitle(activeView)}</h2></div>
           <div className="topbar-actions">
             {effectiveRole === "manager" && <button className="primary-button" onClick={requestStartNewReview} type="button"><Plus size={18} />New Review</button>}
+            {remoteMode && session && profile && <button className="icon-button" disabled={remoteLoading} onClick={refreshCloudData} title="Refresh cloud data" type="button"><RefreshCw size={18} /></button>}
             <button className="icon-button" onClick={() => window.print()} title="Print" type="button"><Printer size={18} /></button>
             {remoteMode && <button className="icon-button" onClick={signOut} title="Sign out" type="button"><LogOut size={18} /></button>}
           </div>
@@ -1161,7 +1173,7 @@ export default function Home() {
             onCopyLastShareUrl={copyLastShareUrl}
             onCreateBriefShare={createBriefShareLink}
             onCreateShare={createShareLink}
-            onCreateReportShare={() => createReportShareLink(initialFilters)}
+            onCreateReportShare={() => createReportShareLink({ ...initialFilters, sortMode: initialSortMode })}
             onExportBackup={exportBackup}
             onImportBackup={importBackupFile}
             onInvite={inviteUser}
@@ -1339,7 +1351,7 @@ function MetricCard({ icon, label, value }) {
 
 function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, onCreateReportShare, onDuplicate = () => {}, onEdit, onExport, onFilter, onResetFilters, onSelect, onSort, sortMode }) {
   const archiveStats = getStats(filteredReviews);
-  const filterSummary = formatReportFilters(filters);
+  const filterSummary = formatReportFilters({ ...filters, sortMode });
   return (
     <div className="view-grid">
       <section className="filter-bar">

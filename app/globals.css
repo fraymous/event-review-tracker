@@ -254,6 +254,11 @@ button {
   width: 38px;
 }
 
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .notice {
   align-items: center;
   background: #e8f6ef;
