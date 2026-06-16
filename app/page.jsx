@@ -88,9 +88,10 @@ const demoAccessUsers = [
   { id: "local-leadership", fullName: "Executive / Director", email: "leadership@local.demo", role: "leadership", createdAt: "2026-06-01T00:00:00.000Z" },
 ];
 
-const initialFilters = { query: "", status: "All", tag: "All", manager: "All", due: "All", dateFrom: "", dateTo: "" };
+const initialFilters = { query: "", status: "All", tag: "All", manager: "All", due: "All", consumption: "All", dateFrom: "", dateTo: "" };
 const initialSortMode = "Date newest";
 const followUpFilterOptions = ["All", "No", "Yes"];
+const consumptionFilterOptions = ["All", "No", "Yes"];
 const reviewSortOptions = [initialSortMode, "Date oldest", "Rating high", "Rating low", "Needs follow-up"];
 const shareExpiryOptions = [7, 14, 30, 60, 90];
 const backupType = "event-review-tracker-backup";
@@ -239,6 +240,7 @@ function formatReportFilters(filters = {}) {
   if (normalized.tag !== "All") parts.push(`Tag: ${normalized.tag}`);
   if (normalized.manager !== "All") parts.push(`Manager: ${normalized.manager}`);
   if (normalized.due !== "All") parts.push(`Due: ${normalized.due}`);
+  if (normalized.consumption !== "All") parts.push(`Consumption: ${normalized.consumption}`);
   if (normalized.dateFrom) parts.push(`From: ${formatDate(normalized.dateFrom)}`);
   if (normalized.dateTo) parts.push(`To: ${formatDate(normalized.dateTo)}`);
   if (normalized.sortMode && normalized.sortMode !== initialSortMode) parts.push(`Sort: ${normalized.sortMode}`);
@@ -1359,6 +1361,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
       <section className="filter-bar">
         <label className="search-box"><Search size={18} /><input aria-label="Search reviews" onChange={(event) => onFilter("query", event.target.value)} placeholder="Search client, contact, venue, notes" value={filters.query} /></label>
         <Select icon={<Filter size={16} />} label="Needs Follow-up" onChange={(value) => onFilter("status", followUpFilterToStatus(value))} options={followUpFilterOptions} value={statusToFollowUpFilter(filters.status)} />
+        <Select icon={<Utensils size={16} />} label="Consumption" onChange={(value) => onFilter("consumption", value)} options={consumptionFilterOptions} value={filters.consumption || "All"} />
         <Select icon={<Users size={16} />} label="Manager" onChange={(value) => onFilter("manager", value)} options={["All", ...managers]} value={filters.manager} />
         <Select icon={<ArrowUpDown size={16} />} label="Sort" onChange={onSort} options={reviewSortOptions} value={sortMode} />
         <DateFilter label="From" onChange={(value) => onFilter("dateFrom", value)} value={filters.dateFrom} />
