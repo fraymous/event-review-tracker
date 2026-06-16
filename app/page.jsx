@@ -570,7 +570,8 @@ export default function Home() {
     });
   }
 
-  async function saveReview(form) {
+  async function saveReview(form, options = {}) {
+    const saveAndNew = options.nextAction === "new";
     const existing = reviews.find((review) => review.id === form.id);
     if (remoteMode && supabaseClient && profile) {
       if (effectiveRole !== "manager") return false;
@@ -587,10 +588,15 @@ export default function Home() {
         await deleteRemoteAttachments(supabaseClient, removedAttachments);
         await uploadRemoteAttachments(supabaseClient, saved.id, pendingAttachments, profile);
         await refreshRemoteData({ selectId: saved.id });
-        setEditingReview(null);
         setFormDirty(false);
-        setActiveView("detail");
-        setNotice(consumptionPendingMigration ? "Review saved. Run the Supabase consumption migration to persist consumption counts." : existing ? "Review updated." : "Review created.");
+        if (saveAndNew) {
+          setEditingReview(blankReview(profile?.full_name || normalized.managerName || "Michael Frazier"));
+          setActiveView("form");
+        } else {
+          setEditingReview(null);
+          setActiveView("detail");
+        }
+        setNotice(consumptionPendingMigration ? "Review saved. Run the Supabase consumption migration to persist consumption counts." : saveAndNew ? "Review saved. Ready for next review." : existing ? "Review updated." : "Review created.");
         return true;
       } catch (error) {
         setErrorNotice(error.message);
@@ -603,10 +609,15 @@ export default function Home() {
     const normalized = normalizeReview(form, existing);
     setReviews((current) => existing ? current.map((review) => review.id === existing.id ? normalized : review) : [normalized, ...current]);
     setSelectedId(normalized.id);
-    setEditingReview(null);
     setFormDirty(false);
-    setActiveView("detail");
-    setNotice(existing ? "Review updated." : "Review created.");
+    if (saveAndNew) {
+      setEditingReview(blankReview(profile?.full_name || normalized.managerName || "Michael Frazier"));
+      setActiveView("form");
+    } else {
+      setEditingReview(null);
+      setActiveView("detail");
+    }
+    setNotice(saveAndNew ? "Review saved. Ready for next review." : existing ? "Review updated." : "Review created.");
     return true;
   }
 
@@ -1357,11 +1368,13 @@ function ReviewDetail({ review, role, links, onCopy = () => {}, onCreateShare, o
 function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave, saving = false }) {
   const [form, setForm] = useState(() => ({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) }));
   const [submitting, setSubmitting] = useState(false);
+  const [submitIntent, setSubmitIntent] = useState("save");
   const savingState = saving || submitting;
 
   useEffect(() => {
     setForm({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) });
     setSubmitting(false);
+    setSubmitIntent("save");
     onDirtyChange(false);
     return () => onDirtyChange(false);
   }, [onDirtyChange, review?.clientName, review?.createdAt, review?.eventDate, review?.id, review?.updatedAt]);
@@ -1415,9 +1428,11 @@ function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave, saving
   async function submit(event) {
     event.preventDefault();
     if (savingState) return;
+    const nextAction = event.nativeEvent?.submitter?.value === "save-new" ? "new" : "detail";
+    setSubmitIntent(nextAction === "new" ? "save-new" : "save");
     setSubmitting(true);
     try {
-      const saved = await onSave(form);
+      const saved = await onSave(form, { nextAction });
       if (!saved) setSubmitting(false);
     } catch {
       setSubmitting(false);
@@ -1430,7 +1445,7 @@ function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave, saving
       <section className="form-section"><div className="section-heading"><h3>Review</h3><span>Rating required</span></div><div className="form-grid"><SelectInput label="Overall Rating" onChange={(value) => update("overallRating", value)} options={["", "1", "2", "3", "4", "5"]} renderOption={(value) => (value ? `${value}/5` : "Select rating")} required value={String(form.overallRating ?? "")} /><SelectInput label="Needs Follow-up" onChange={setNeedsFollowUp} options={["No", "Yes"]} value={needsFollowUp ? "Yes" : "No"} /></div>{needsFollowUp && <TextArea label="Follow-up Notes" onChange={(value) => update("followUpNotes", value)} required value={form.followUpNotes || ""} />}<TextArea label="Event Summary" onChange={(value) => update("summary", value)} value={form.summary} /><TextArea label="Food / Culinary Notes" onChange={(value) => update("culinaryNotes", value)} value={form.culinaryNotes} /><TextArea label="Operational Notes" onChange={(value) => update("operationalNotes", value)} value={form.operationalNotes} /><TextArea label="Client Feedback" onChange={(value) => update("clientFeedback", value)} value={form.clientFeedback} /><div className="form-grid"><TextArea label="Wins" onChange={(value) => update("wins", value)} value={form.wins} /><TextArea label="Issues" onChange={(value) => update("issues", value)} value={form.issues} /></div></section>
       <ConsumptionInputs consumption={form.consumption} onAppliesChange={setConsumptionApplies} onChange={updateConsumption} />
       <section className="form-section"><div className="section-heading"><h3>Files</h3><span>{form.attachments.length} attachments</span></div><label className="upload-box"><Upload size={20} /><span>Attach PDFs or photos</span><input accept=".pdf,image/*" multiple onChange={(event) => addAttachments(event.target.files)} type="file" /></label><div className="attachment-editor">{form.attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}<span>{attachment.name}</span><em>{formatFileSize(attachment.size)}{attachment.isPendingUpload ? " pending" : ""}</em><button type="button" onClick={() => removeAttachment(attachment.id)} title="Remove"><X size={16} /></button></div>)}</div></section>
-      <div className="form-actions"><button className="secondary-button" disabled={savingState} onClick={onCancel} type="button"><X size={16} />Cancel</button><button className="primary-button" disabled={savingState} type="submit"><Save size={16} />{savingState ? "Saving..." : "Save Review"}</button></div>
+      <div className="form-actions"><button className="secondary-button" disabled={savingState} onClick={onCancel} type="button"><X size={16} />Cancel</button>{!form.id && <button className="secondary-button" disabled={savingState} type="submit" value="save-new"><Plus size={16} />{savingState && submitIntent === "save-new" ? "Saving..." : "Save & New"}</button>}<button className="primary-button" disabled={savingState} type="submit" value="save"><Save size={16} />{savingState && submitIntent === "save" ? "Saving..." : "Save Review"}</button></div>
     </form>
   );
 }
