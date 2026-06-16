@@ -4,15 +4,15 @@ A hosted-ready Next.js prototype for banquet and event review tracking.
 
 ## What is implemented
 
-- Manager-focused review entry for one event at a time
+- Manager-focused review entry for one event at a time, including Save & New for back-to-back entry
 - Executive/director read-only view toggle
-- Dashboard with recent events, follow-up queue, attachment count, culinary notes queue, event volume, and review signals
+- Dashboard with recent events, follow-up queue, attachment count, culinary notes queue, consumption count, event volume, and review signals
 - Executive Brief view for a printable 30-day leadership snapshot with attention items, culinary watchlist, and recent event notes
-- Searchable event archive with follow-up, manager, date-range filters, current-view summary, and full-note CSV export
+- Searchable event archive with follow-up, consumption, manager, date-range filters, sort controls, current-view summary, and full-note CSV export
 - Event detail view with client contact, food/culinary notes, optional consumption counts, operational notes, client feedback, wins, issues, follow-up notes, shared access, and attachments
 - Manager quick actions for marking whether a review needs follow-up from the detail view
 - Access directory for role-based manager and leadership visibility
-- Revocable single-review, executive-brief, and filtered-report share links with manager-selected expiration and a visible copy fallback
+- Revocable single-review, executive-brief, follow-up report, and filtered-report share links with manager-selected expiration and visible copy/open fallbacks
 - JSON backup and restore for local-demo data while the app is being used before hosted storage is connected
 - Confirmation prompts for closing reviews, revoking links, and restoring demo data
 - Print-friendly review view for PDF export
