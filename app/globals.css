@@ -605,6 +605,13 @@ button {
   flex: 0 0 auto;
 }
 
+.share-url-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .share-url-box {
   align-items: center;
   background: var(--panel-soft);
@@ -1331,6 +1338,7 @@ button {
   .brief-note-grid,
   .detail-grid,
   .form-grid,
+  .share-url-row,
   .share-link-builder,
   .quick-share-grid {
     grid-template-columns: 1fr;

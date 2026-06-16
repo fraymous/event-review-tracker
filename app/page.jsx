@@ -822,6 +822,23 @@ export default function Home() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  async function copyLastShareUrl() {
+    if (!lastShareUrl) return;
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(lastShareUrl);
+      } catch {
+        // Clipboard permission can be unavailable in some browsers.
+      }
+    }
+    setNotice("Share URL copied.");
+  }
+
+  function openLastShareUrl() {
+    if (!lastShareUrl) return;
+    window.open(lastShareUrl, "_blank", "noopener,noreferrer");
+  }
+
 
   async function inviteUser(payload) {
     if (!remoteMode || !session?.access_token) {
@@ -1141,6 +1158,7 @@ export default function Home() {
             role={effectiveRole}
             remoteMode={remoteMode}
             onCopy={copyShareUrl}
+            onCopyLastShareUrl={copyLastShareUrl}
             onCreateBriefShare={createBriefShareLink}
             onCreateShare={createShareLink}
             onCreateReportShare={() => createReportShareLink(initialFilters)}
@@ -1148,6 +1166,7 @@ export default function Home() {
             onImportBackup={importBackupFile}
             onInvite={inviteUser}
             onOpen={openShareUrl}
+            onOpenLastShareUrl={openLastShareUrl}
             onReset={requestResetDemoData}
             onRevoke={requestRevokeShareLink}
             onShareExpiryDays={setShareExpiryDays}
@@ -1486,7 +1505,7 @@ function ConsumptionInputs({ consumption, onAppliesChange, onChange }) {
   );
 }
 
-function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, role, remoteMode, onCopy, onCreateBriefShare, onCreateShare, onCreateReportShare, onExportBackup, onImportBackup, onInvite, onOpen, onReset, onRevoke, onShareExpiryDays, shareExpiryDays, supabaseStatus }) {
+function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, role, remoteMode, onCopy, onCopyLastShareUrl, onCreateBriefShare, onCreateShare, onCreateReportShare, onExportBackup, onImportBackup, onInvite, onOpen, onOpenLastShareUrl, onReset, onRevoke, onShareExpiryDays, shareExpiryDays, supabaseStatus }) {
   const shareableReviews = useMemo(() => [...reviews].sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)), [reviews]);
   const [selectedShareReviewId, setSelectedShareReviewId] = useState(shareableReviews[0]?.id || "");
   const sortedLinks = [...links].sort(sortShareLinks);
@@ -1547,7 +1566,7 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
           {inactiveLinks.map(renderShareRow)}
         </div>
       </section>
-      {lastShareUrl && <section className="content-band"><div className="section-heading"><h3>Last Share URL</h3><span>Copy fallback</span></div><label className="share-url-box"><LinkIcon size={16} /><input onFocus={(event) => event.target.select()} readOnly value={lastShareUrl} /></label></section>}
+      {lastShareUrl && <section className="content-band"><div className="section-heading"><h3>Last Share URL</h3><span>Copy fallback</span></div><div className="share-url-row"><label className="share-url-box"><LinkIcon size={16} /><input onFocus={(event) => event.target.select()} readOnly value={lastShareUrl} /></label><div className="row-actions"><button className="icon-button" onClick={onOpenLastShareUrl} title="Open" type="button"><ExternalLink size={16} /></button><button className="icon-button" onClick={onCopyLastShareUrl} title="Copy" type="button"><Copy size={16} /></button></div></div></section>}
       {role === "manager" && <section className="content-band"><div className="section-heading"><h3>Create Link</h3><span>Expires in {shareExpiryDays} days</span></div><div className="share-controls share-link-builder"><SelectInput label="Link Expires" onChange={(value) => onShareExpiryDays(normalizeShareExpiryDays(value))} options={shareExpiryOptions.map(String)} renderOption={(value) => `${value} days`} value={String(shareExpiryDays)} /><SelectInput disabled={shareableReviews.length === 0} label="Single Review" onChange={setSelectedShareReviewId} options={shareableReviews.map((review) => review.id)} renderOption={(value) => { const review = shareableReviews.find((item) => item.id === value); return review ? `${formatDate(review.eventDate)} - ${review.clientName}` : "No reviews"; }} value={selectedShareReviewId} /><button className="primary-button" disabled={!selectedShareReview} onClick={() => selectedShareReview && onCreateShare(selectedShareReview)} type="button"><LinkIcon size={16} />Single Review</button></div><div className="quick-share-grid"><button className="quick-share" onClick={onCreateBriefShare} type="button"><span>Executive Brief</span><FileText size={16} /></button><button className="quick-share" onClick={onCreateReportShare} type="button"><span>All Reviews Report</span><Share2 size={16} /></button></div></section>}
       <section className="content-band">
         <div className="section-heading"><h3>Data Backup</h3><span>{remoteMode ? "Cloud copy" : "Local safety copy"}</span></div>
