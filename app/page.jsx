@@ -9,6 +9,8 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Copy,
   Download,
@@ -504,6 +506,10 @@ export default function Home() {
   const sortedReviews = useMemo(() => sortReviewList(filteredReviews, sortMode), [filteredReviews, sortMode]);
 
   const selectedReview = useMemo(() => reviews.find((review) => review.id === selectedId) || sortedReviews[0] || reviews[0], [reviews, selectedId, sortedReviews]);
+  const detailReviewList = useMemo(() => {
+    const activeId = selectedReview?.id;
+    return activeId && sortedReviews.some((review) => review.id === activeId) ? sortedReviews : sortReviewList(reviews, initialSortMode);
+  }, [reviews, selectedReview?.id, sortedReviews]);
   const stats = useMemo(() => getStats(reviews), [reviews]);
   const sharedLink = useMemo(() => shareToken ? shareLinks.find((link) => link.token === shareToken) : null, [shareLinks, shareToken]);
   const sharedReview = useMemo(() => {
@@ -1178,7 +1184,9 @@ export default function Home() {
             onEdit={startEdit}
             onOpen={openShareUrl}
             onPrint={() => window.print()}
+            onSelectReview={(review) => { setSelectedId(review.id); setActiveView("detail"); }}
             onSetStatus={updateReviewStatus}
+            reviewList={detailReviewList}
           />
         )}
 
@@ -1423,7 +1431,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
   );
 }
 
-function ReviewDetail({ review, role, links, onCopy = () => {}, onCreateShare, onDelete = () => {}, onDuplicate = () => {}, onEdit, onOpen = () => {}, onPrint, onSetStatus = () => {} }) {
+function ReviewDetail({ review, role, links, onCopy = () => {}, onCreateShare, onDelete = () => {}, onDuplicate = () => {}, onEdit, onOpen = () => {}, onPrint, onSelectReview = () => {}, onSetStatus = () => {}, reviewList = [] }) {
   if (!review) {
     return (
       <section className="content-band unavailable">
@@ -1436,10 +1444,13 @@ function ReviewDetail({ review, role, links, onCopy = () => {}, onCreateShare, o
   const sortedLinks = [...links].sort(sortShareLinks);
   const activeLinkCount = sortedLinks.filter(isShareActive).length;
   const attachmentCount = (review.attachments || []).length;
+  const reviewIndex = reviewList.findIndex((item) => item.id === review.id);
+  const previousReview = reviewIndex > 0 ? reviewList[reviewIndex - 1] : null;
+  const nextReview = reviewIndex >= 0 && reviewIndex < reviewList.length - 1 ? reviewList[reviewIndex + 1] : null;
 
   return (
     <div className="detail-layout">
-      <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions"><StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="secondary-button" onClick={() => onDuplicate(review)} type="button"><Copy size={16} />Duplicate</button><button className="secondary-button danger-button" onClick={() => onDelete(review)} type="button"><Trash2 size={16} />Delete</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
+      <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions">{reviewList.length > 1 && <><button className="secondary-button" disabled={!previousReview} onClick={() => previousReview && onSelectReview(previousReview)} type="button"><ChevronLeft size={16} />Previous</button><button className="secondary-button" disabled={!nextReview} onClick={() => nextReview && onSelectReview(nextReview)} type="button">Next<ChevronRight size={16} /></button></>}<StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="secondary-button" onClick={() => onDuplicate(review)} type="button"><Copy size={16} />Duplicate</button><button className="secondary-button danger-button" onClick={() => onDelete(review)} type="button"><Trash2 size={16} />Delete</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
       <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><ConsumptionDetail consumption={review.consumption} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
       <section className="content-band two-column"><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><div className="people-list"><span>{isActionableFollowUp(review) ? "Needs follow-up" : "No follow-up needed"}</span><span>{hasCulinarySignal(review) ? "Culinary notes entered" : "No culinary note"}</span><span>{getConsumptionApplies(review.consumption) ? "Consumption applies" : "No consumption charge"}</span><span className="hidden-metadata-pill">{attachmentCount} attachment{attachmentCount === 1 ? "" : "s"}</span><span className="hidden-metadata-pill">{activeLinkCount} active link{activeLinkCount === 1 ? "" : "s"}</span><span className="hidden-metadata-pill">Created {formatDateTime(review.createdAt)}</span><span className="hidden-metadata-pill">Updated {formatDateTime(review.updatedAt)}</span></div></div><AttachmentList attachments={review.attachments || []} /></section>
       <section className="content-band"><div className="section-heading"><h3>Shared Access</h3><span>{activeLinkCount} active</span></div><div className="share-mini-list">{sortedLinks.length === 0 && <p className="small-muted">No links created.</p>}{sortedLinks.slice(0, 3).map((link) => { const statusLabel = link.revokedAt ? "Revoked" : isShareActive(link) ? "Active" : "Expired"; return <div className="share-mini" key={link.id}><div><span>{statusLabel}</span><em>Expires {formatDate(link.expiresAt.slice(0, 10))}</em></div>{role === "manager" && <div className="row-actions"><button className="icon-button" onClick={() => onOpen(link.token)} title="Open" type="button"><ExternalLink size={16} /></button><button className="icon-button" onClick={() => onCopy(link.token)} title="Copy" type="button"><Copy size={16} /></button></div>}</div>; })}{sortedLinks.length > 3 && <p className="small-muted">{sortedLinks.length - 3} more link{sortedLinks.length - 3 === 1 ? "" : "s"} in Sharing.</p>}</div></section>
