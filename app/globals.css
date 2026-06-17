@@ -1441,9 +1441,13 @@ button {
   .sidebar,
   .topbar,
   .notice,
+  .filter-bar,
+  .share-filter-bar,
+  .row-actions,
   .detail-actions,
   .brief-hero .secondary-button,
   .sticky-actions,
+  .backup-actions,
   .form-actions,
   .shared-topbar .secondary-button {
     display: none !important;
