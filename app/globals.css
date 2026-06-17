@@ -795,7 +795,7 @@ button {
 
 .archive-table {
   border-collapse: collapse;
-  min-width: 1240px;
+  min-width: 1340px;
   width: 100%;
 }
 
@@ -892,6 +892,7 @@ button {
   color: var(--amber);
 }
 
+.attachment-signal,
 .consumption-signal {
   border-radius: 999px;
   display: inline-flex;
@@ -902,6 +903,18 @@ button {
   padding: 6px 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.attachment-signal.has-attachments {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+}
+
+.attachment-signal.no-attachments {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .consumption-signal.has-consumption {

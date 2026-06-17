@@ -88,9 +88,10 @@ const demoAccessUsers = [
   { id: "local-leadership", fullName: "Executive / Director", email: "leadership@local.demo", role: "leadership", createdAt: "2026-06-01T00:00:00.000Z" },
 ];
 
-const initialFilters = { query: "", status: "All", tag: "All", manager: "All", due: "All", consumption: "All", dateFrom: "", dateTo: "" };
+const initialFilters = { query: "", status: "All", tag: "All", manager: "All", due: "All", attachments: "All", consumption: "All", dateFrom: "", dateTo: "" };
 const initialSortMode = "Date newest";
 const followUpFilterOptions = ["All", "No", "Yes"];
+const attachmentFilterOptions = ["All", "No", "Yes"];
 const consumptionFilterOptions = ["All", "No", "Yes"];
 const reviewSortOptions = [initialSortMode, "Date oldest", "Rating high", "Rating low", "Needs follow-up"];
 const shareExpiryOptions = [7, 14, 30, 60, 90];
@@ -210,6 +211,12 @@ function consumptionDisplay(review) {
   return getConsumptionApplies(review?.consumption) ? "Applies" : "No";
 }
 
+function attachmentDisplay(review) {
+  const count = (review?.attachments || []).length;
+  if (!count) return "No";
+  return `${count} file${count === 1 ? "" : "s"}`;
+}
+
 function hasCulinarySignal(review) {
   return String(review?.culinaryNotes || "").trim() || (review?.tags || []).includes("culinary");
 }
@@ -248,6 +255,7 @@ function formatReportFilters(filters = {}) {
   if (normalized.tag !== "All") parts.push(`Tag: ${normalized.tag}`);
   if (normalized.manager !== "All") parts.push(`Manager: ${normalized.manager}`);
   if (normalized.due !== "All") parts.push(`Due: ${normalized.due}`);
+  if (normalized.attachments !== "All") parts.push(`Attachments: ${normalized.attachments}`);
   if (normalized.consumption !== "All") parts.push(`Consumption: ${normalized.consumption}`);
   if (normalized.dateFrom) parts.push(`From: ${formatDate(normalized.dateFrom)}`);
   if (normalized.dateTo) parts.push(`To: ${formatDate(normalized.dateTo)}`);
@@ -1390,6 +1398,7 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
       <section className="filter-bar">
         <label className="search-box"><Search size={18} /><input aria-label="Search reviews" onChange={(event) => onFilter("query", event.target.value)} placeholder="Search client, contact, venue, notes" value={filters.query} /></label>
         <Select icon={<Filter size={16} />} label="Needs Follow-up" onChange={(value) => onFilter("status", followUpFilterToStatus(value))} options={followUpFilterOptions} value={statusToFollowUpFilter(filters.status)} />
+        <Select icon={<FileText size={16} />} label="Attachments" onChange={(value) => onFilter("attachments", value)} options={attachmentFilterOptions} value={filters.attachments || "All"} />
         <Select icon={<Utensils size={16} />} label="Consumption" onChange={(value) => onFilter("consumption", value)} options={consumptionFilterOptions} value={filters.consumption || "All"} />
         <Select icon={<Users size={16} />} label="Manager" onChange={(value) => onFilter("manager", value)} options={["All", ...managers]} value={filters.manager} />
         <Select icon={<ArrowUpDown size={16} />} label="Sort" onChange={onSort} options={reviewSortOptions} value={sortMode} />
@@ -1827,6 +1836,7 @@ function ReviewTable({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit 
             <th>Manager</th>
             <th>Rating</th>
             <th>Needs Follow-up</th>
+            <th>Attachments</th>
             <th>Consumption</th>
             <th>Follow-up Notes</th>
             {showActions && <th>Actions</th>}
@@ -1842,6 +1852,7 @@ function ReviewTable({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit 
               <td>{review.managerName}</td>
               <td>{ratingLabel(review.overallRating)}</td>
               <td><StatusPill status={review.followUpStatus} /></td>
+              <td><AttachmentSignal review={review} /></td>
               <td><ConsumptionSignal review={review} /></td>
               <td><FollowUpCell review={review} /></td>
               {showActions && <td><ReviewRowActions onCreateShare={onCreateShare} onDuplicate={onDuplicate} onEdit={onEdit} onSelect={onSelect} onSetStatus={onSetStatus} review={review} role={role} /></td>}
@@ -1866,6 +1877,7 @@ function MobileReviewList({ onCreateShare = () => {}, onDuplicate = () => {}, on
           <div className="mobile-review-fields">
             <span><strong>Contact</strong>{review.clientContact || "N/A"}</span>
             <span><strong>Rating</strong>{ratingLabel(review.overallRating)}</span>
+            <span><strong>Attachments</strong>{attachmentDisplay(review)}</span>
             <span><strong>Consumption</strong>{previewText(consumptionDisplay(review), 58)}</span>
           </div>
           <p>{isActionableFollowUp(review) ? followUpMeta(review) : previewText(review.summary || review.wins, 120)}</p>
@@ -1898,6 +1910,13 @@ function ConsumptionSignal({ review }) {
   const title = label === "Applies" ? "Consumption applies; no amounts entered." : label;
 
   return <span className={`consumption-signal ${applies ? "has-consumption" : "no-consumption"}`} title={title}>{previewText(label, 64)}</span>;
+}
+
+function AttachmentSignal({ review }) {
+  const count = (review?.attachments || []).length;
+  const label = attachmentDisplay(review);
+
+  return <span className={`attachment-signal ${count ? "has-attachments" : "no-attachments"}`} title={count ? `${count} attachment${count === 1 ? "" : "s"}` : "No attachments"}>{label}</span>;
 }
 
 function DetailBlock({ icon, title, value, tone }) {

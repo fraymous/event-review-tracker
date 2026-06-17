@@ -8,7 +8,7 @@ A hosted-ready Next.js prototype for banquet and event review tracking.
 - Executive/director read-only view toggle
 - Dashboard with recent events, follow-up queue, attachment count, culinary notes queue, consumption count/activity, event volume, and review signals
 - Executive Brief view for a printable 30-day leadership snapshot with attention items, culinary watchlist, consumption watchlist, and recent event notes
-- Searchable event archive with follow-up, consumption, manager, date-range filters, sort controls, row-level consumption signals, current-view summary, resettable empty states, and full-note CSV export
+- Searchable event archive with follow-up, attachment, consumption, manager, date-range filters, sort controls, row-level file/consumption signals, current-view summary, resettable empty states, and full-note CSV export
 - Event detail view with client contact, food/culinary notes, optional consumption counts, operational notes, client feedback, wins, issues, follow-up notes, shared access, and attachments
 - Manager quick actions for marking whether a review needs follow-up from the detail view and clearing open follow-ups from archive rows/cards
 - Access directory for role-based manager and leadership visibility
@@ -88,4 +88,4 @@ This route uses `SUPABASE_SERVICE_ROLE_KEY`, so it only works after that environ
 
 ## Report share links
 
-Share links support three scopes: `single-review`, `executive-brief`, and `filtered-report`. Managers choose an expiration window before creating links. Brief links render the 30-day leadership snapshot. Filtered report links store the archive filters used when the link was created, including follow-up state and date range, and render a read-only event list with summary metrics. The report view displays the saved filter summary so recipients know whether they are seeing all reviews or a specific archive slice, and each event row can open the full read-only review detail.
+Share links support three scopes: `single-review`, `executive-brief`, and `filtered-report`. Managers choose an expiration window before creating links. Brief links render the 30-day leadership snapshot. Filtered report links store the archive filters used when the link was created, including follow-up state, attachments, consumption, and date range, and render a read-only event list with summary metrics. The report view displays the saved filter summary so recipients know whether they are seeing all reviews or a specific archive slice, and each event row can open the full read-only review detail.
