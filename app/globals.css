@@ -787,7 +787,7 @@ button {
 
 .archive-table {
   border-collapse: collapse;
-  min-width: 1120px;
+  min-width: 1240px;
   width: 100%;
 }
 
@@ -882,6 +882,30 @@ button {
 .status-pill.needs-follow-up {
   background: #fff3d6;
   color: var(--amber);
+}
+
+.consumption-signal {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  max-width: 220px;
+  overflow: hidden;
+  padding: 6px 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.consumption-signal.has-consumption {
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+  color: #0e7490;
+}
+
+.consumption-signal.no-consumption {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .follow-up-cell {
@@ -1291,6 +1315,16 @@ button {
   justify-items: center;
   min-height: 160px;
   text-align: center;
+}
+
+.empty-state p {
+  line-height: 1.45;
+  margin: 0;
+  max-width: 420px;
+}
+
+.empty-state .secondary-button {
+  margin-top: 4px;
 }
 
 .shared-shell {

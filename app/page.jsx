@@ -202,6 +202,12 @@ function followUpDisplay(status) {
   return isNeedsFollowUpStatus(status) ? "Yes" : "No";
 }
 
+function consumptionDisplay(review) {
+  const summary = formatConsumptionSummary(review?.consumption);
+  if (summary) return summary;
+  return getConsumptionApplies(review?.consumption) ? "Applies" : "No";
+}
+
 function hasCulinarySignal(review) {
   return String(review?.culinaryNotes || "").trim() || (review?.tags || []).includes("culinary");
 }
@@ -634,15 +640,17 @@ export default function Home() {
     return true;
   }
 
-  async function updateReviewStatus(reviewId, followUpStatus) {
+  async function updateReviewStatus(reviewId, followUpStatus, options = {}) {
     if (effectiveRole !== "manager") return false;
     const review = reviews.find((item) => item.id === reviewId);
     if (!review) return;
-    await saveReview({
+    const saved = await saveReview({
       ...review,
       followUpStatus,
       followUpNotes: followUpStatus === "Needs follow-up" ? review.followUpNotes : "",
     });
+    if (saved && options.returnView) setActiveView(options.returnView);
+    return saved;
   }
 
   async function deleteReview(reviewId) {
@@ -1130,6 +1138,7 @@ export default function Home() {
             onFilter={updateFilter}
             onResetFilters={() => { setFilters(initialFilters); setSortMode(initialSortMode); }}
             onSelect={(review) => { setSelectedId(review.id); setActiveView("detail"); }}
+            onSetStatus={updateReviewStatus}
             onSort={setSortMode}
             sortMode={sortMode}
           />
@@ -1353,7 +1362,7 @@ function MetricCard({ icon, label, value }) {
   return <div className="metric-card"><div className="metric-icon">{icon}</div><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, onCreateReportShare, onDuplicate = () => {}, onEdit, onExport, onFilter, onResetFilters, onSelect, onSort, sortMode }) {
+function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, onCreateReportShare, onDuplicate = () => {}, onEdit, onExport, onFilter, onResetFilters, onSelect, onSetStatus, onSort, sortMode }) {
   const archiveStats = getStats(filteredReviews);
   const filterSummary = formatReportFilters({ ...filters, sortMode });
   return (
@@ -1371,7 +1380,16 @@ function ArchiveView({ filters, filteredReviews, managers, role, onCreateShare, 
         {role === "manager" && <button className="secondary-button" onClick={() => onCreateReportShare()} type="button"><Share2 size={16} />Report</button>}
       </section>
       <section className="archive-summary"><div><p className="eyebrow">Current View</p><strong>{filterSummary}</strong></div><div className="archive-summary-metrics"><span>{archiveStats.total} matching</span><span>{archiveStats.openFollowUps} open</span><span>{archiveStats.attachmentCount} attachments</span><span>{archiveStats.culinaryFlagCount} culinary</span><span>{archiveStats.consumptionCount} consumption</span></div></section>
-      <section className="content-band archive-results"><div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th><th>Actions</th></tr></thead><tbody>{filteredReviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td><td><div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onDuplicate(review)} title="Duplicate" type="button"><Copy size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div></td></tr>)}</tbody></table></div><MobileReviewList onCreateShare={onCreateShare} onDuplicate={onDuplicate} onEdit={onEdit} onSelect={onSelect} reviews={filteredReviews} role={role} />{filteredReviews.length === 0 && <EmptyState title="No matching reviews" />}</section>
+      <section className="content-band archive-results">
+        {filteredReviews.length > 0 ? (
+          <>
+            <ReviewTable onCreateShare={onCreateShare} onDuplicate={onDuplicate} onEdit={onEdit} onSelect={onSelect} onSetStatus={onSetStatus} reviews={filteredReviews} role={role} showActions />
+            <MobileReviewList onCreateShare={onCreateShare} onDuplicate={onDuplicate} onEdit={onEdit} onSelect={onSelect} onSetStatus={onSetStatus} reviews={filteredReviews} role={role} />
+          </>
+        ) : (
+          <EmptyState actionLabel="Reset filters" description="No events match the current search, filters, and date range." onAction={onResetFilters} title="No matching reviews" />
+        )}
+      </section>
     </div>
   );
 }
@@ -1719,16 +1737,60 @@ function SharedReportView({ link, report, onPrint }) {
       <section className="content-band">
         <div className="section-heading"><h3>Shared Report</h3><span>Expires {formatDate(link.expiresAt.slice(0, 10))}</span></div>
         <div className="report-filter-summary"><Filter size={16} /><span>{formatReportFilters(report?.filters)}</span></div>
-        <div className="table-wrap"><table className="archive-table"><thead><tr><th>Event</th><th>Date</th><th>Contact</th><th>Venue</th><th>Manager</th><th>Rating</th><th>Needs Follow-up</th><th>Follow-up Notes</th></tr></thead><tbody>{reviews.map((review) => <tr key={review.id}><td><button className="link-button" onClick={() => setSelectedReview(review)} type="button">{review.clientName}</button></td><td>{formatDate(review.eventDate)}</td><td>{review.clientContact || "N/A"}</td><td>{review.venue}</td><td>{review.managerName}</td><td>{ratingLabel(review.overallRating)}</td><td><StatusPill status={review.followUpStatus} /></td><td><FollowUpCell review={review} /></td></tr>)}</tbody></table></div>
-        <MobileReviewList onSelect={setSelectedReview} reviews={reviews} role="leadership" />
-        {reviews.length === 0 && <EmptyState title="No reviews in this report" />}
+        {reviews.length > 0 ? (
+          <>
+            <ReviewTable onSelect={setSelectedReview} reviews={reviews} role="leadership" />
+            <MobileReviewList onSelect={setSelectedReview} reviews={reviews} role="leadership" />
+          </>
+        ) : (
+          <EmptyState description="This shared report was created from a view with no matching events." title="No reviews in this report" />
+        )}
       </section>
       <div className="sticky-actions"><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button></div>
     </div>
   );
 }
 
-function MobileReviewList({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit = () => {}, onSelect, reviews, role }) {
+function ReviewTable({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit = () => {}, onSelect, onSetStatus = () => {}, reviews, role, showActions = false }) {
+  return (
+    <div className="table-wrap">
+      <table className="archive-table">
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Date</th>
+            <th>Contact</th>
+            <th>Venue</th>
+            <th>Manager</th>
+            <th>Rating</th>
+            <th>Needs Follow-up</th>
+            <th>Consumption</th>
+            <th>Follow-up Notes</th>
+            {showActions && <th>Actions</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {reviews.map((review) => (
+            <tr key={review.id}>
+              <td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td>
+              <td>{formatDate(review.eventDate)}</td>
+              <td>{review.clientContact || "N/A"}</td>
+              <td>{review.venue}</td>
+              <td>{review.managerName}</td>
+              <td>{ratingLabel(review.overallRating)}</td>
+              <td><StatusPill status={review.followUpStatus} /></td>
+              <td><ConsumptionSignal review={review} /></td>
+              <td><FollowUpCell review={review} /></td>
+              {showActions && <td><ReviewRowActions onCreateShare={onCreateShare} onDuplicate={onDuplicate} onEdit={onEdit} onSelect={onSelect} onSetStatus={onSetStatus} review={review} role={role} /></td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MobileReviewList({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit = () => {}, onSelect, onSetStatus = () => {}, reviews, role }) {
   return (
     <div className="mobile-review-list">
       {reviews.map((review) => (
@@ -1741,13 +1803,38 @@ function MobileReviewList({ onCreateShare = () => {}, onDuplicate = () => {}, on
           <div className="mobile-review-fields">
             <span><strong>Contact</strong>{review.clientContact || "N/A"}</span>
             <span><strong>Rating</strong>{ratingLabel(review.overallRating)}</span>
+            <span><strong>Consumption</strong>{previewText(consumptionDisplay(review), 58)}</span>
           </div>
           <p>{isActionableFollowUp(review) ? followUpMeta(review) : previewText(review.summary || review.wins, 120)}</p>
-          <div className="row-actions"><button className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>{role === "manager" && <><button className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button><button className="icon-button" onClick={() => onDuplicate(review)} title="Duplicate" type="button"><Copy size={16} /></button><button className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button></>}</div>
+          <ReviewRowActions onCreateShare={onCreateShare} onDuplicate={onDuplicate} onEdit={onEdit} onSelect={onSelect} onSetStatus={onSetStatus} review={review} role={role} />
         </article>
       ))}
     </div>
   );
+}
+
+function ReviewRowActions({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit = () => {}, onSelect, onSetStatus = () => {}, review, role }) {
+  return (
+    <div className="row-actions">
+      <button aria-label={`View ${review.clientName}`} className="icon-button" onClick={() => onSelect(review)} title="View" type="button"><Eye size={16} /></button>
+      {role === "manager" && (
+        <>
+          <button aria-label={`Edit ${review.clientName}`} className="icon-button" onClick={() => onEdit(review)} title="Edit" type="button"><Pencil size={16} /></button>
+          <button aria-label={`Duplicate ${review.clientName}`} className="icon-button" onClick={() => onDuplicate(review)} title="Duplicate" type="button"><Copy size={16} /></button>
+          <button aria-label={`Share ${review.clientName}`} className="icon-button" onClick={() => onCreateShare(review)} title="Share" type="button"><LinkIcon size={16} /></button>
+          {isActionableFollowUp(review) && <button aria-label={`Clear follow-up for ${review.clientName}`} className="icon-button" onClick={() => onSetStatus(review.id, "Draft", { returnView: "archive" })} title="Clear follow-up" type="button"><CheckCircle2 size={16} /></button>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ConsumptionSignal({ review }) {
+  const label = consumptionDisplay(review);
+  const applies = getConsumptionApplies(review?.consumption);
+  const title = label === "Applies" ? "Consumption applies; no amounts entered." : label;
+
+  return <span className={`consumption-signal ${applies ? "has-consumption" : "no-consumption"}`} title={title}>{previewText(label, 64)}</span>;
 }
 
 function DetailBlock({ icon, title, value, tone }) {
@@ -1807,8 +1894,15 @@ function FollowUpCell({ review }) {
   return <div className="follow-up-cell"><span>{isActionableFollowUp(review) ? followUpMeta(review) : "No"}</span></div>;
 }
 
-function EmptyState({ title }) {
-  return <div className="empty-state"><ClipboardList size={28} /><strong>{title}</strong></div>;
+function EmptyState({ actionLabel, description, onAction, title }) {
+  return (
+    <div className="empty-state">
+      <ClipboardList size={28} />
+      <strong>{title}</strong>
+      {description && <p>{description}</p>}
+      {actionLabel && onAction && <button className="secondary-button" onClick={onAction} type="button"><RotateCcw size={16} />{actionLabel}</button>}
+    </div>
+  );
 }
 
 function Select({ icon, label, options, value, onChange }) {
