@@ -1328,6 +1328,7 @@ function Dashboard({ stats, reviews, role, onSelect }) {
   const recent = [...reviews].sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)).slice(0, 5);
   const followUps = reviews.filter(isActionableFollowUp).sort(sortFollowUps).slice(0, 5);
   const culinaryReviews = reviews.filter(hasCulinarySignal).sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)).slice(0, 5);
+  const consumptionReviews = reviews.filter((review) => getConsumptionApplies(review.consumption)).sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)).slice(0, 5);
   const maxTrendCount = Math.max(1, ...stats.monthlyTrend.map((item) => item.count));
   return (
     <div className="view-grid">
@@ -1340,6 +1341,10 @@ function Dashboard({ stats, reviews, role, onSelect }) {
         <div><div className="section-heading"><h3>Follow-up Queue</h3><span>{followUps.length} shown</span></div><div className="review-list">{followUps.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{followUpQueueText(review)}</span></div><div className="queue-pills"><StatusPill status={review.followUpStatus} /></div></button>)}{followUps.length === 0 && <p className="small-muted">No open follow-ups.</p>}</div></div>
         <div><div className="section-heading"><h3>Culinary Notes</h3><span>Entered notes</span></div><div className="review-list">{culinaryReviews.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{previewText(review.culinaryNotes)}</span></div><StatusPill status={review.followUpStatus} /></button>)}{culinaryReviews.length === 0 && <p className="small-muted">No culinary notes entered.</p>}</div></div>
       </section>
+      <section className="content-band">
+        <div className="section-heading"><h3>Consumption Activity</h3><span>{consumptionReviews.length} shown</span></div>
+        <div className="review-list">{consumptionReviews.map((review) => <button className="review-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{formatDate(review.eventDate)} - {previewText(consumptionDisplay(review), 90)}</span></div><StatusPill status={review.followUpStatus} /></button>)}{consumptionReviews.length === 0 && <p className="small-muted">No consumption entries yet.</p>}</div>
+      </section>
       <section className="content-band"><div className="section-heading"><h3>Event Volume</h3><span>Rating required</span></div><div className="trend-grid">{stats.monthlyTrend.map((item) => <div className="trend-item" key={item.label}><span>{item.label}</span><div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(8, (item.count / maxTrendCount) * 100)}%` }} /></div><strong>{item.count}</strong><em>{item.ratingCount ? `${item.ratingCount} rated` : "No rating"}</em></div>)}{stats.monthlyTrend.length === 0 && <p className="small-muted">Trend data appears after reviews are added.</p>}</div></section>
     </div>
   );
@@ -1350,6 +1355,7 @@ function ExecutiveBrief({ reviews, onSelect, showPrintButton = true }) {
   const briefStats = getStats(last30);
   const attentionItems = reviews.filter(isActionableFollowUp).sort(sortFollowUps).slice(0, 4);
   const culinaryItems = last30.filter((review) => (review.tags || []).includes("culinary") || String(review.culinaryNotes || "").trim()).slice(0, 4);
+  const consumptionItems = last30.filter((review) => getConsumptionApplies(review.consumption)).slice(0, 4);
   const recentNotes = last30.slice(0, 5);
 
   return (
@@ -1362,6 +1368,7 @@ function ExecutiveBrief({ reviews, onSelect, showPrintButton = true }) {
       <section className="content-band two-column">
         <div><div className="section-heading"><h3>Attention Items</h3><span>{attentionItems.length} active</span></div><div className="brief-list">{attentionItems.map((review) => <button className="brief-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{followUpMeta(review)}</span><p>{previewText(review.issues || review.operationalNotes)}</p></div><StatusPill status={review.followUpStatus} /></button>)}{attentionItems.length === 0 && <p className="small-muted">No open follow-ups.</p>}</div></div>
         <div><div className="section-heading"><h3>Culinary Watchlist</h3><span>{culinaryItems.length} noted</span></div><div className="brief-list">{culinaryItems.map((review) => <button className="brief-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{formatDate(review.eventDate)} | {review.venue}</span><p>{previewText(review.culinaryNotes)}</p></div><StatusPill status={review.followUpStatus} /></button>)}{culinaryItems.length === 0 && <p className="small-muted">No culinary notes in the last 30 days.</p>}</div></div>
+        <div><div className="section-heading"><h3>Consumption Watchlist</h3><span>{consumptionItems.length} charged</span></div><div className="brief-list">{consumptionItems.map((review) => <button className="brief-row" key={review.id} onClick={() => onSelect(review)} type="button"><div><strong>{review.clientName}</strong><span>{formatDate(review.eventDate)} | {review.venue}</span><p>{previewText(consumptionDisplay(review), 110)}</p></div><StatusPill status={review.followUpStatus} /></button>)}{consumptionItems.length === 0 && <p className="small-muted">No consumption entries in the last 30 days.</p>}</div></div>
       </section>
       <section className="content-band">
         <div className="section-heading"><h3>Recent Event Notes</h3><span>{recentNotes.length} shown</span></div>
