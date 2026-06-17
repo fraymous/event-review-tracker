@@ -741,6 +741,14 @@ button {
   gap: 10px;
 }
 
+.share-filter-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 .search-box,
 .select-box,
 .date-box {
@@ -1386,7 +1394,8 @@ button {
   .search-box,
   .select-box,
   .date-box,
-  .filter-bar .secondary-button {
+  .filter-bar .secondary-button,
+  .share-filter-bar .secondary-button {
     flex: 1 1 100%;
   }
 

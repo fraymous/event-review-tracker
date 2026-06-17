@@ -94,6 +94,8 @@ const followUpFilterOptions = ["All", "No", "Yes"];
 const consumptionFilterOptions = ["All", "No", "Yes"];
 const reviewSortOptions = [initialSortMode, "Date oldest", "Rating high", "Rating low", "Needs follow-up"];
 const shareExpiryOptions = [7, 14, 30, 60, 90];
+const shareStatusFilterOptions = ["Active", "All", "Expired", "Revoked"];
+const shareScopeFilterOptions = ["All", "Review", "Brief", "Report"];
 const backupType = "event-review-tracker-backup";
 
 function blankReview(managerName = "Michael Frazier") {
@@ -269,6 +271,17 @@ function sortShareLinks(a, b) {
   const activeDifference = Number(isShareActive(b)) - Number(isShareActive(a));
   if (activeDifference !== 0) return activeDifference;
   return new Date(b.createdAt || b.expiresAt) - new Date(a.createdAt || a.expiresAt);
+}
+
+function shareLinkStatus(link) {
+  if (link.revokedAt) return "Revoked";
+  return isShareActive(link) ? "Active" : "Expired";
+}
+
+function shareLinkScope(link) {
+  if (link.scope === "executive-brief") return "Brief";
+  if (link.scope === "filtered-report") return "Report";
+  return "Review";
 }
 
 function getShareExpiryDate(days) {
@@ -1543,9 +1556,11 @@ function ConsumptionInputs({ consumption, onAppliesChange, onChange }) {
 function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, role, remoteMode, onCopy, onCopyLastShareUrl, onCreateBriefShare, onCreateShare, onCreateReportShare, onExportBackup, onImportBackup, onInvite, onOpen, onOpenLastShareUrl, onReset, onRevoke, onShareExpiryDays, shareExpiryDays, supabaseStatus }) {
   const shareableReviews = useMemo(() => [...reviews].sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate)), [reviews]);
   const [selectedShareReviewId, setSelectedShareReviewId] = useState(shareableReviews[0]?.id || "");
+  const [linkQuery, setLinkQuery] = useState("");
+  const [linkStatusFilter, setLinkStatusFilter] = useState("Active");
+  const [linkScopeFilter, setLinkScopeFilter] = useState("All");
   const sortedLinks = [...links].sort(sortShareLinks);
   const activeLinks = sortedLinks.filter(isShareActive);
-  const inactiveLinks = sortedLinks.filter((link) => !isShareActive(link));
   const selectedShareReview = shareableReviews.find((review) => review.id === selectedShareReviewId);
   const invitesReady = Boolean(healthStatus?.features?.managerInvites);
   const consumptionStorageReady = Boolean(healthStatus?.features?.consumptionStorage);
@@ -1566,15 +1581,49 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
     }
   }, [selectedShareReviewId, shareableReviews]);
 
-  function renderShareRow(link) {
+  function describeShareLink(link) {
     const review = reviews.find((item) => item.id === link.reviewId);
-    const isReport = link.scope === "filtered-report";
-    const isBrief = link.scope === "executive-brief";
-    const name = isBrief ? "Executive Brief" : isReport ? "Filtered Report" : review?.clientName || "Unknown review";
-    const description = isBrief ? "30-day leadership snapshot" : isReport ? formatReportFilters(link.filters) : "Single review public link";
-    const scopeClass = isBrief ? "brief" : isReport ? "report" : "review";
-    const scopeLabel = isBrief ? "Brief" : isReport ? "Report" : "Review";
-    const statusLabel = link.revokedAt ? "Revoked" : isShareActive(link) ? "Active" : "Expired";
+    const scopeLabel = shareLinkScope(link);
+    const isReport = scopeLabel === "Report";
+    const isBrief = scopeLabel === "Brief";
+    return {
+      description: isBrief ? "30-day leadership snapshot" : isReport ? formatReportFilters(link.filters) : "Single review public link",
+      name: isBrief ? "Executive Brief" : isReport ? "Filtered Report" : review?.clientName || "Unknown review",
+      review,
+      scopeClass: scopeLabel.toLowerCase(),
+      scopeLabel,
+      statusLabel: shareLinkStatus(link),
+    };
+  }
+
+  const normalizedLinkQuery = linkQuery.trim().toLowerCase();
+  const visibleLinks = sortedLinks.filter((link) => {
+    const meta = describeShareLink(link);
+    const matchesStatus = linkStatusFilter === "All" || meta.statusLabel === linkStatusFilter;
+    const matchesScope = linkScopeFilter === "All" || meta.scopeLabel === linkScopeFilter;
+    const searchText = [
+      meta.name,
+      meta.description,
+      meta.scopeLabel,
+      meta.statusLabel,
+      meta.review?.clientContact,
+      meta.review?.venue,
+      meta.review?.managerName,
+    ].filter(Boolean).join(" ").toLowerCase();
+    return matchesStatus && matchesScope && (!normalizedLinkQuery || searchText.includes(normalizedLinkQuery));
+  });
+  const visibleActiveLinks = visibleLinks.filter(isShareActive);
+  const visibleInactiveLinks = visibleLinks.filter((link) => !isShareActive(link));
+  const linkFiltersActive = normalizedLinkQuery || linkStatusFilter !== "Active" || linkScopeFilter !== "All";
+
+  function resetLinkFilters() {
+    setLinkQuery("");
+    setLinkStatusFilter("Active");
+    setLinkScopeFilter("All");
+  }
+
+  function renderShareRow(link) {
+    const { description, name, scopeClass, scopeLabel, statusLabel } = describeShareLink(link);
 
     return (
       <div className="share-row" key={link.id}>
@@ -1593,12 +1642,19 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
       <section className="metric-grid"><MetricCard icon={<ShieldCheck />} label="Active links" value={activeLinks.length} /><MetricCard icon={<Eye />} label="Role access" value="Read-only" /><MetricCard icon={<Mail />} label="Manager invites" value={inviteMetric} /><MetricCard icon={<Utensils />} label="Consumption" value={consumptionMetric} /><MetricCard icon={<Lock />} label="Storage" value={remoteMode || supabaseStatus.configured ? "Cloud" : "Local"} /></section>
       {role === "manager" && remoteMode && healthStatus && !consumptionStorageReady && <section className="content-band"><div className="access-status"><AlertTriangle size={18} /><div><strong>Consumption storage needs setup</strong><span>Run the Supabase consumption migration before relying on saved consumption choices or counts.</span></div></div></section>}
       <section className="content-band">
-        <div className="section-heading"><h3>Review Links</h3><span>{activeLinks.length} active</span></div>
+        <div className="section-heading"><h3>Review Links</h3><span>{visibleLinks.length} shown | {activeLinks.length} active</span></div>
+        <div className="share-filter-bar">
+          <label className="search-box"><Search size={18} /><input aria-label="Search share links" onChange={(event) => setLinkQuery(event.target.value)} placeholder="Search links, clients, reports" value={linkQuery} /></label>
+          <Select icon={<Filter size={16} />} label="Status" onChange={setLinkStatusFilter} options={shareStatusFilterOptions} value={linkStatusFilter} />
+          <Select icon={<Share2 size={16} />} label="Scope" onChange={setLinkScopeFilter} options={shareScopeFilterOptions} value={linkScopeFilter} />
+          {linkFiltersActive && <button className="secondary-button" onClick={resetLinkFilters} type="button"><RotateCcw size={16} />Reset</button>}
+        </div>
         <div className="share-list">
           {sortedLinks.length === 0 && <EmptyState title="No share links yet" />}
-          {activeLinks.map(renderShareRow)}
-          {inactiveLinks.length > 0 && <div className="share-group-label">Expired or revoked</div>}
-          {inactiveLinks.map(renderShareRow)}
+          {sortedLinks.length > 0 && visibleLinks.length === 0 && <EmptyState actionLabel="Reset link filters" description="No shared links match this search or filter set." onAction={resetLinkFilters} title="No matching share links" />}
+          {visibleActiveLinks.map(renderShareRow)}
+          {visibleInactiveLinks.length > 0 && <div className="share-group-label">Expired or revoked</div>}
+          {visibleInactiveLinks.map(renderShareRow)}
         </div>
       </section>
       {lastShareUrl && <section className="content-band"><div className="section-heading"><h3>Last Share URL</h3><span>Copy fallback</span></div><div className="share-url-row"><label className="share-url-box"><LinkIcon size={16} /><input onFocus={(event) => event.target.select()} readOnly value={lastShareUrl} /></label><div className="row-actions"><button className="icon-button" onClick={onOpenLastShareUrl} title="Open" type="button"><ExternalLink size={16} /></button><button className="icon-button" onClick={onCopyLastShareUrl} title="Copy" type="button"><Copy size={16} /></button></div></div></section>}
