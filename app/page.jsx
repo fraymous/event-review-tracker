@@ -336,34 +336,50 @@ export default function Home() {
   const effectiveRole = remoteMode ? profile?.role || "manager" : role;
 
   useEffect(() => {
-    const client = getSupabaseBrowserClient();
-    setSupabaseClient(client);
-    if (!client) {
-      setReviews(loadReviews());
-      setShareLinks(loadShareLinks());
-      setAccessUsers(demoAccessUsers);
-    }
+    let ignore = false;
+    let authSubscription = null;
     const params = new URLSearchParams(window.location.search);
     setShareToken(params.get("share") || "");
-    setHydrated(true);
-    if (!client) return undefined;
-    getCurrentSession(client).then((currentSession) => setSession(currentSession)).catch((error) => setErrorNotice(error.message));
-    const { data } = client.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
-    return () => data.subscription.unsubscribe();
-  }, []);
 
-  useEffect(() => {
-    let ignore = false;
-    fetch("/api/health")
-      .then((response) => response.json())
-      .then((payload) => {
-        if (!ignore) setHealthStatus(payload);
-      })
-      .catch(() => {
-        if (!ignore) setHealthStatus({ ok: false });
+    async function initializeStorage() {
+      let healthPayload = { ok: false, storageMode: "local-demo" };
+      try {
+        const response = await fetch("/api/health");
+        healthPayload = await response.json();
+      } catch {
+        healthPayload = { ok: false, storageMode: "local-demo" };
+      }
+
+      if (ignore) return;
+      setHealthStatus(healthPayload);
+
+      const client = healthPayload.storageMode === "supabase" ? getSupabaseBrowserClient() : null;
+      setSupabaseClient(client);
+      if (!client) {
+        setReviews(loadReviews());
+        setShareLinks(loadShareLinks());
+        setAccessUsers(demoAccessUsers);
+        if (healthPayload?.checks?.databaseReachable === false) {
+          setErrorNotice("Cloud database is unavailable. Local demo mode is active until Supabase is restored.");
+        }
+        setHydrated(true);
+        return;
+      }
+
+      setHydrated(true);
+      getCurrentSession(client).then((currentSession) => {
+        if (!ignore) setSession(currentSession);
+      }).catch((error) => {
+        if (!ignore) setErrorNotice(error.message);
       });
+      const { data } = client.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+      authSubscription = data.subscription;
+    }
+
+    initializeStorage();
     return () => {
       ignore = true;
+      authSubscription?.unsubscribe();
     };
   }, []);
 

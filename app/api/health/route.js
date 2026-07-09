@@ -33,24 +33,28 @@ async function getConsumptionStoragePresence(canCheckStorage) {
 
 export async function GET() {
   const allowPublicSignUp = process.env.NEXT_PUBLIC_ALLOW_SIGN_UP !== "false";
-  const checks = {
+  const configuredChecks = {
     supabaseUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
     supabaseAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     supabaseServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     allowPublicSignUp,
   };
 
-  const supabaseReady = checks.supabaseUrl && checks.supabaseAnonKey;
-  const sharedLinksReady = supabaseReady && checks.supabaseServiceRoleKey;
-  const hasProfiles = await getProfilePresence(sharedLinksReady);
-  const consumptionStorage = await getConsumptionStoragePresence(sharedLinksReady);
-  const firstManagerSignup = allowPublicSignUp && hasProfiles !== true;
+  const supabaseConfigured = configuredChecks.supabaseUrl && configuredChecks.supabaseAnonKey;
+  const canCheckDatabase = supabaseConfigured && configuredChecks.supabaseServiceRoleKey;
+  const hasProfiles = await getProfilePresence(canCheckDatabase);
+  const consumptionStorage = await getConsumptionStoragePresence(canCheckDatabase);
+  const databaseReachable = canCheckDatabase ? hasProfiles !== null : null;
+  const supabaseReady = supabaseConfigured && databaseReachable !== false;
+  const sharedLinksReady = supabaseReady && configuredChecks.supabaseServiceRoleKey;
+  const firstManagerSignup = supabaseReady && allowPublicSignUp && hasProfiles !== true;
 
   return NextResponse.json({
     ok: true,
     storageMode: supabaseReady ? "supabase" : "local-demo",
     checks: {
-      ...checks,
+      ...configuredChecks,
+      databaseReachable,
       hasProfiles,
       consumptionStorage,
     },
@@ -59,7 +63,7 @@ export async function GET() {
       firstManagerSignup,
       publicSharedLinks: sharedLinksReady,
       managerInvites: sharedLinksReady,
-      consumptionStorage: consumptionStorage !== false,
+      consumptionStorage: databaseReachable !== false && consumptionStorage !== false,
     },
   });
 }
