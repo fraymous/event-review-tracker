@@ -6,7 +6,10 @@
         "dev": "next dev",
         "build": "next build",
         "start": "next start",
-        "check": "npm run build && npm audit"
+        "check": "npm run build && npm audit",
+        "data:backup": "node scripts/supabase-backup.mjs",
+        "data:check": "node scripts/supabase-safety-check.mjs",
+        "release:guard": "npm run data:backup && npm run data:check && npm run check"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.108.1",

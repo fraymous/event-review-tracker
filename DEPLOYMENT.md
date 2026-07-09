@@ -2,6 +2,19 @@
 
 Use this when moving the review tracker from local demo mode to hosted V1.
 
+## 0. Data Safety
+
+Production data lives in Supabase, so code deployments should not erase reviews. Before every production deploy, schema change, Supabase reconnect, or integration change:
+
+1. Run `npm run data:backup`.
+2. Confirm the backup JSON was written under `backups/`.
+3. Run `npm run data:check -- --expected-ref mwykznfkejoecyqkblhp`.
+4. If reviews already exist, include a minimum count from the latest backup, for example `npm run data:check -- --expected-ref mwykznfkejoecyqkblhp --min-reviews 25`.
+5. Run `npm run release:guard` before pushing or deploying when practical.
+6. Do not remove, disconnect, reset, truncate, or replace a Supabase resource without a fresh backup and explicit approval.
+
+The current production Supabase resource is `event-review-tracker-db`, project ref `mwykznfkejoecyqkblhp`. If production is intentionally moved to a different Supabase project, update the expected ref in this checklist and in local `EXPECTED_SUPABASE_PROJECT_REF`.
+
 ## 1. Supabase
 
 1. Create a Supabase project.
