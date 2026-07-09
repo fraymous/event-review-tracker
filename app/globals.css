@@ -1049,6 +1049,8 @@ button {
   color: #334155;
   line-height: 1.55;
   margin: 10px 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .people-list {
