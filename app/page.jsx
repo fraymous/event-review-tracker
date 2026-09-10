@@ -85,6 +85,13 @@ const roleCopy = {
   leadership: { label: "Executive / Director", caption: "Read-only archive and trends" },
 };
 
+const usernameAuthDomain = "liveoak.local";
+
+function normalizeAuthIdentifier(value) {
+  const trimmed = String(value || "").trim().toLowerCase();
+  return trimmed.includes("@") ? trimmed : `${trimmed}@${usernameAuthDomain}`;
+}
+
 const demoAccessUsers = [
   { id: "local-manager", fullName: "Michael Frazier", email: "manager@local.demo", role: "manager", createdAt: "2026-06-01T00:00:00.000Z" },
   { id: "local-leadership", fullName: "Executive / Director", email: "leadership@local.demo", role: "leadership", createdAt: "2026-06-01T00:00:00.000Z" },
@@ -479,7 +486,7 @@ export default function Home() {
     setErrorNotice("");
     try {
       const isCreatingAccount = allowSignUp && authMode === "sign-up";
-      const payload = { email: authForm.email.trim(), password: authForm.password };
+      const payload = { email: normalizeAuthIdentifier(authForm.email), password: authForm.password };
       const result = isCreatingAccount ? await supabaseClient.auth.signUp(payload) : await supabaseClient.auth.signInWithPassword(payload);
       if (result.error) throw result.error;
       setNotice(isCreatingAccount ? "Account created. Check email confirmation if required." : "Signed in.");
@@ -1309,7 +1316,7 @@ function AuthShell({ allowSignUp, authForm, authLoading, authMode, errorNotice, 
         {notice && <Notice tone="success" text={notice} />}
         {errorNotice && <Notice tone="error" text={errorNotice} />}
         <form className="auth-form" onSubmit={onSubmit}>
-          <label className="field"><span>Email</span><div className="input-with-icon"><Mail size={18} /><input autoComplete="email" onChange={(event) => onAuthForm((current) => ({ ...current, email: event.target.value }))} required type="email" value={authForm.email} /></div></label>
+          <label className="field"><span>Username or Email</span><div className="input-with-icon"><Mail size={18} /><input autoComplete="username" onChange={(event) => onAuthForm((current) => ({ ...current, email: event.target.value }))} required type="text" value={authForm.email} /></div></label>
           <label className="field"><span>Password</span><div className="input-with-icon"><KeyRound size={18} /><input autoComplete={isSignUp ? "new-password" : "current-password"} minLength={6} onChange={(event) => onAuthForm((current) => ({ ...current, password: event.target.value }))} required type="password" value={authForm.password} /></div></label>
           <button className="primary-button" disabled={authLoading} type="submit">{authLoading ? "Working..." : isSignUp ? "Create Account" : "Sign In"}</button>
         </form>
