@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { REVIEW_BUCKET, dbReviewToUi } from "../../../../lib/supabase-data";
+import { REVIEW_BUCKET, dbReviewToUi, signedUrlsForAttachments } from "../../../../lib/supabase-data";
 import { applyReviewFilters, sortReviewList } from "../../../../lib/review-store";
 import { getSupabaseAdminClient } from "../../../../lib/supabase-server";
 
@@ -71,7 +71,8 @@ export async function GET(_request, context) {
       return NextResponse.json({ error: reportError.message }, { status: 500 });
     }
 
-    const uiReviews = (reviews || []).map((review) => stripInternalAttachmentPaths(dbReviewToUi(review)));
+    const signedUrls = await signedUrlsForAttachments(supabase, reviews || []);
+    const uiReviews = (reviews || []).map((review) => stripInternalAttachmentPaths(dbReviewToUi(review, signedUrls)));
 
     if (link.scope === "executive-brief") {
       return NextResponse.json({

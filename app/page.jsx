@@ -2025,9 +2025,55 @@ function AttachmentList({ attachments }) {
       <button aria-expanded={isExpanded} className="attachment-toggle" onClick={() => setExpanded((current) => !current)} type="button"><span>Attachments</span><em>{attachments.length}</em><ChevronRight className="attachment-toggle-icon" size={16} /></button>
       <div className="attachment-list">
         {attachments.length === 0 && <p className="small-muted">No attachments.</p>}
-        {attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}{attachment.downloadUrl ? <a href={attachment.downloadUrl} rel="noreferrer" target="_blank">{attachment.name}</a> : <span>{attachment.name}</span>}<em>{formatFileSize(attachment.size)}</em><small>{formatDateTime(attachment.uploadedAt)}</small></div>)}
+        {attachments.map((attachment) => <AttachmentPreviewCard attachment={attachment} key={attachment.id} />)}
       </div>
     </div>
+  );
+}
+
+function isPdfAttachment(attachment) {
+  const type = String(attachment?.type || "").toLowerCase();
+  const name = String(attachment?.name || "").toLowerCase();
+  return type.includes("pdf") || name.endsWith(".pdf");
+}
+
+function isImageAttachment(attachment) {
+  const type = String(attachment?.type || "").toLowerCase();
+  const name = String(attachment?.name || "").toLowerCase();
+  return type.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(name);
+}
+
+function pdfPreviewUrl(url) {
+  return url ? `${url}#toolbar=0&navpanes=0` : "";
+}
+
+function AttachmentPreviewCard({ attachment }) {
+  const hasPreviewUrl = Boolean(attachment.downloadUrl);
+  const isPdf = isPdfAttachment(attachment);
+  const isImage = isImageAttachment(attachment);
+
+  return (
+    <article className="attachment-card">
+      <div className="attachment-row">
+        {isPdf ? <FileText size={18} /> : <ImageIcon size={18} />}
+        <span>{attachment.name}</span>
+        <em>{formatFileSize(attachment.size)}</em>
+        <small>{formatDateTime(attachment.uploadedAt)}</small>
+        {hasPreviewUrl && <a className="attachment-open-link" href={attachment.downloadUrl} rel="noreferrer" target="_blank"><ExternalLink size={14} />Open</a>}
+      </div>
+      {hasPreviewUrl && isImage && (
+        <a className="attachment-preview attachment-image-preview" href={attachment.downloadUrl} rel="noreferrer" target="_blank">
+          <img alt={`${attachment.name} preview`} loading="lazy" src={attachment.downloadUrl} />
+        </a>
+      )}
+      {hasPreviewUrl && isPdf && (
+        <div className="attachment-preview attachment-pdf-preview">
+          <iframe src={pdfPreviewUrl(attachment.downloadUrl)} title={`${attachment.name} preview`} />
+        </div>
+      )}
+      {hasPreviewUrl && !isImage && !isPdf && <p className="attachment-preview-placeholder">Preview is not available for this file type.</p>}
+      {!hasPreviewUrl && <p className="attachment-preview-placeholder">Preview is not available for this attachment.</p>}
+    </article>
   );
 }
 
