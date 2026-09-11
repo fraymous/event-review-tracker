@@ -39,6 +39,11 @@ async function main() {
     failures.push(`Consumption column check failed: ${consumptionError.message}`);
   }
 
+  const { error: guestCountError } = await supabase.from("event_reviews").select("id, guest_count").limit(1);
+  if (guestCountError) {
+    failures.push(`Guest count column check failed: ${guestCountError.message}`);
+  }
+
   const summary = {
     ok: failures.length === 0,
     projectRef,
@@ -47,6 +52,7 @@ async function main() {
     checks: {
       tablesReachable: true,
       consumptionColumn: !consumptionError,
+      guestCountColumn: !guestCountError,
       minReviews,
     },
     failures,

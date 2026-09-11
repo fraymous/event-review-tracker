@@ -17,7 +17,7 @@ async function getProfilePresence(canCheckProfiles) {
   return Number(count || 0) > 0;
 }
 
-async function getConsumptionStoragePresence(canCheckStorage) {
+async function getReviewColumnPresence(canCheckStorage, column) {
   if (!canCheckStorage) return null;
 
   const supabase = getSupabaseAdminClient();
@@ -25,7 +25,7 @@ async function getConsumptionStoragePresence(canCheckStorage) {
 
   const { error } = await supabase
     .from("event_reviews")
-    .select("consumption", { head: true })
+    .select(column, { head: true })
     .limit(1);
 
   return !error;
@@ -43,7 +43,8 @@ export async function GET() {
   const supabaseConfigured = configuredChecks.supabaseUrl && configuredChecks.supabaseAnonKey;
   const canCheckDatabase = supabaseConfigured && configuredChecks.supabaseServiceRoleKey;
   const hasProfiles = await getProfilePresence(canCheckDatabase);
-  const consumptionStorage = await getConsumptionStoragePresence(canCheckDatabase);
+  const consumptionStorage = await getReviewColumnPresence(canCheckDatabase, "consumption");
+  const guestCountStorage = await getReviewColumnPresence(canCheckDatabase, "guest_count");
   const databaseReachable = canCheckDatabase ? hasProfiles !== null : null;
   const supabaseReady = supabaseConfigured && databaseReachable !== false;
   const sharedLinksReady = supabaseReady && configuredChecks.supabaseServiceRoleKey;
@@ -57,6 +58,7 @@ export async function GET() {
       databaseReachable,
       hasProfiles,
       consumptionStorage,
+      guestCountStorage,
     },
     features: {
       authAndDatabase: supabaseReady,
@@ -64,6 +66,7 @@ export async function GET() {
       publicSharedLinks: sharedLinksReady,
       managerInvites: sharedLinksReady,
       consumptionStorage: databaseReachable !== false && consumptionStorage !== false,
+      guestCountStorage: databaseReachable !== false && guestCountStorage !== false,
     },
   });
 }

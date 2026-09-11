@@ -476,6 +476,52 @@ button {
   text-align: left;
 }
 
+.attachments-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.attachment-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 0 0 4px;
+  text-align: left;
+  width: 100%;
+}
+
+.attachment-toggle span {
+  font-size: 1rem;
+}
+
+.attachment-toggle em {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-style: normal;
+  margin-left: auto;
+}
+
+.attachment-toggle-icon {
+  color: var(--muted);
+  flex: 0 0 auto;
+  transition: transform 0.18s ease;
+}
+
+.attachments-panel.is-expanded .attachment-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.attachments-panel:not(.is-expanded) .attachment-list {
+  display: none;
+}
+
 .review-row span,
 .brief-row span,
 .share-row span,
@@ -1483,6 +1529,23 @@ button {
   .detail-block,
   .metric-card {
     box-shadow: none;
+  }
+
+  .attachments-panel .attachment-list {
+    display: grid !important;
+  }
+
+  .attachment-toggle {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .attachment-toggle-icon {
+    display: none;
+  }
+
+  .attachment-row {
+    break-inside: avoid;
   }
 }
 

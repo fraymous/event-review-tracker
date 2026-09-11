@@ -50,6 +50,7 @@ import {
   formatDateTime,
   formatFileSize,
   formatConsumptionSummary,
+  formatGuestCount,
   getConsumptionApplies,
   getReviewDueState,
   getShareUrl,
@@ -59,6 +60,7 @@ import {
   loadShareLinks,
   makeId,
   normalizeConsumption,
+  normalizeGuestCount,
   saveReviews,
   saveShareLinks,
   sortReviewList,
@@ -114,6 +116,7 @@ function blankReview(managerName = "Michael Frazier") {
     clientName: "",
     clientContact: "",
     eventDate: new Date().toISOString().slice(0, 10),
+    guestCount: "",
     venue: "",
     eventType: "Corporate",
     managerName,
@@ -151,6 +154,7 @@ function normalizeReview(form, existing) {
     staffInvolved: Array.isArray(form.staffInvolved)
       ? form.staffInvolved
       : String(form.staffInvolved || "").split(",").map((item) => item.trim()).filter(Boolean),
+    guestCount: normalizeGuestCount(form.guestCount),
     overallRating: form.overallRating === "" ? null : Number(form.overallRating),
     consumption: normalizeConsumption(form.consumption),
     tags: Array.isArray(form.tags) ? form.tags : [],
@@ -1474,7 +1478,7 @@ function ReviewDetail({ review, role, links, onCopy = () => {}, onCreateShare, o
   return (
     <div className="detail-layout">
       <section className="detail-header"><div><p className="eyebrow">{review.eventType}</p><h3>{review.clientName}</h3><div className="meta-line"><span><CalendarDays size={16} />{formatDate(review.eventDate)}</span><span><Building2 size={16} />{review.venue}</span><span><Users size={16} />{review.managerName}</span>{review.clientContact && <span><Mail size={16} />{review.clientContact}</span>}</div></div><div className="detail-actions">{reviewList.length > 1 && <><button className="secondary-button" disabled={!previousReview} onClick={() => previousReview && onSelectReview(previousReview)} type="button"><ChevronLeft size={16} />Previous</button><button className="secondary-button" disabled={!nextReview} onClick={() => nextReview && onSelectReview(nextReview)} type="button">Next<ChevronRight size={16} /></button></>}<StatusPill status={review.followUpStatus} /><button className="secondary-button" onClick={onPrint} type="button"><Printer size={16} />PDF</button>{role === "manager" && <><button className="secondary-button" onClick={() => onCreateShare(review)} type="button"><Share2 size={16} />Share</button><button className="secondary-button" onClick={() => onDuplicate(review)} type="button"><Copy size={16} />Duplicate</button><button className="secondary-button danger-button" onClick={() => onDelete(review)} type="button"><Trash2 size={16} />Delete</button><button className="primary-button" onClick={() => onEdit(review)} type="button"><Pencil size={16} />Edit</button></>}</div></section>
-      <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><ConsumptionDetail consumption={review.consumption} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
+      <section className="detail-grid"><DetailBlock title="Event Summary" value={review.summary} /><DetailBlock title="Client Contact" value={review.clientContact} icon={<Mail />} /><DetailBlock title="Guest Count" value={formatGuestCount(review.guestCount)} icon={<Users />} /><DetailBlock title="Food / Culinary Notes" value={review.culinaryNotes} icon={<Utensils />} /><ConsumptionDetail consumption={review.consumption} /><DetailBlock title="Operational Notes" value={review.operationalNotes} /><DetailBlock title="Client Feedback" value={review.clientFeedback} />{isActionableFollowUp(review) && <DetailBlock title="Follow-up Notes" value={review.followUpNotes} tone="warning" />}<DetailBlock title="Wins" value={review.wins} /><DetailBlock title="Issues" value={review.issues} tone="warning" /></section>
       <section className="content-band two-column"><div><div className="section-heading"><h3>Review Signals</h3><span>Rating {ratingLabel(review.overallRating)}</span></div><div className="people-list"><span>{isActionableFollowUp(review) ? "Needs follow-up" : "No follow-up needed"}</span><span>{hasCulinarySignal(review) ? "Culinary notes entered" : "No culinary note"}</span><span>{getConsumptionApplies(review.consumption) ? "Consumption applies" : "No consumption charge"}</span><span className="hidden-metadata-pill">{attachmentCount} attachment{attachmentCount === 1 ? "" : "s"}</span><span className="hidden-metadata-pill">{activeLinkCount} active link{activeLinkCount === 1 ? "" : "s"}</span><span className="hidden-metadata-pill">Created {formatDateTime(review.createdAt)}</span><span className="hidden-metadata-pill">Updated {formatDateTime(review.updatedAt)}</span></div></div><AttachmentList attachments={review.attachments || []} /></section>
       <section className="content-band"><div className="section-heading"><h3>Shared Access</h3><span>{activeLinkCount} active</span></div><div className="share-mini-list">{sortedLinks.length === 0 && <p className="small-muted">No links created.</p>}{sortedLinks.slice(0, 3).map((link) => { const statusLabel = link.revokedAt ? "Revoked" : isShareActive(link) ? "Active" : "Expired"; return <div className="share-mini" key={link.id}><div><span>{statusLabel}</span><em>Expires {formatDate(link.expiresAt.slice(0, 10))}</em></div>{role === "manager" && <div className="row-actions"><button aria-label="Open share link" className="icon-button" onClick={() => onOpen(link.token)} title="Open" type="button"><ExternalLink size={16} /></button><button aria-label="Copy share link" className="icon-button" onClick={() => onCopy(link.token)} title="Copy" type="button"><Copy size={16} /></button></div>}</div>; })}{sortedLinks.length > 3 && <p className="small-muted">{sortedLinks.length - 3} more link{sortedLinks.length - 3 === 1 ? "" : "s"} in Sharing.</p>}</div></section>
       {role === "manager" && <div className="sticky-actions status-actions">{review.followUpStatus !== "Needs follow-up" ? <button className="secondary-button" onClick={() => onEdit({ ...review, followUpStatus: "Needs follow-up" })} type="button"><AlertTriangle size={16} />Add Follow-up</button> : <button className="secondary-button" onClick={() => onSetStatus(review.id, "Draft")} type="button"><CheckCircle2 size={16} />No Follow-up</button>}</div>}
@@ -1483,13 +1487,13 @@ function ReviewDetail({ review, role, links, onCopy = () => {}, onCreateShare, o
 }
 
 function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave, saving = false }) {
-  const [form, setForm] = useState(() => ({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) }));
+  const [form, setForm] = useState(() => ({ ...blankReview(), ...review, guestCount: normalizeGuestCount(review?.guestCount), consumption: normalizeConsumption(review?.consumption) }));
   const [submitting, setSubmitting] = useState(false);
   const [submitIntent, setSubmitIntent] = useState("save");
   const savingState = saving || submitting;
 
   useEffect(() => {
-    setForm({ ...blankReview(), ...review, consumption: normalizeConsumption(review?.consumption) });
+    setForm({ ...blankReview(), ...review, guestCount: normalizeGuestCount(review?.guestCount), consumption: normalizeConsumption(review?.consumption) });
     setSubmitting(false);
     setSubmitIntent("save");
     onDirtyChange(false);
@@ -1558,7 +1562,7 @@ function ReviewForm({ review, onCancel, onDirtyChange = () => {}, onSave, saving
   const needsFollowUp = form.followUpStatus === "Needs follow-up";
   return (
     <form aria-busy={savingState} className="review-form" onSubmit={submit}>
-      <section className="form-section"><div className="section-heading"><h3>Event</h3><span>{form.id ? "Edit" : "New"}</span></div><div className="form-grid"><TextInput label="Date" onChange={(value) => update("eventDate", value)} required type="date" value={form.eventDate} /><TextInput label="Event / Client" onChange={(value) => update("clientName", value)} required value={form.clientName} /><TextInput label="Client Contact" onChange={(value) => update("clientContact", value)} value={form.clientContact || ""} /><TextInput label="Venue / Location" onChange={(value) => update("venue", value)} required value={form.venue} /><SelectInput label="Event Type" onChange={(value) => update("eventType", value)} options={eventTypes} value={form.eventType} /><TextInput label="Manager" onChange={(value) => update("managerName", value)} required value={form.managerName} /></div></section>
+      <section className="form-section"><div className="section-heading"><h3>Event</h3><span>{form.id ? "Edit" : "New"}</span></div><div className="form-grid"><TextInput label="Date" onChange={(value) => update("eventDate", value)} required type="date" value={form.eventDate} /><TextInput label="Guest Count" min="0" onChange={(value) => update("guestCount", value)} type="number" value={form.guestCount ?? ""} /><TextInput label="Event / Client" onChange={(value) => update("clientName", value)} required value={form.clientName} /><TextInput label="Client Contact" onChange={(value) => update("clientContact", value)} value={form.clientContact || ""} /><TextInput label="Venue / Location" onChange={(value) => update("venue", value)} required value={form.venue} /><SelectInput label="Event Type" onChange={(value) => update("eventType", value)} options={eventTypes} value={form.eventType} /><TextInput label="Manager" onChange={(value) => update("managerName", value)} required value={form.managerName} /></div></section>
       <section className="form-section"><div className="section-heading"><h3>Review</h3><span>Rating required</span></div><div className="form-grid"><SelectInput label="Overall Rating" onChange={(value) => update("overallRating", value)} options={["", "1", "2", "3", "4", "5"]} renderOption={(value) => (value ? `${value}/5` : "Select rating")} required value={String(form.overallRating ?? "")} /><SelectInput label="Needs Follow-up" onChange={setNeedsFollowUp} options={["No", "Yes"]} value={needsFollowUp ? "Yes" : "No"} /></div>{needsFollowUp && <TextArea label="Follow-up Notes" onChange={(value) => update("followUpNotes", value)} required value={form.followUpNotes || ""} />}<TextArea label="Event Summary" onChange={(value) => update("summary", value)} value={form.summary} /><TextArea label="Food / Culinary Notes" onChange={(value) => update("culinaryNotes", value)} value={form.culinaryNotes} /><TextArea label="Operational Notes" onChange={(value) => update("operationalNotes", value)} value={form.operationalNotes} /><TextArea label="Client Feedback" onChange={(value) => update("clientFeedback", value)} value={form.clientFeedback} /><div className="form-grid"><TextArea label="Wins" onChange={(value) => update("wins", value)} value={form.wins} /><TextArea label="Issues" onChange={(value) => update("issues", value)} value={form.issues} /></div></section>
       <ConsumptionInputs consumption={form.consumption} onAppliesChange={setConsumptionApplies} onChange={updateConsumption} />
       <section className="form-section"><div className="section-heading"><h3>Files</h3><span>{form.attachments.length} attachments</span></div><label className="upload-box"><Upload size={20} /><span>Attach PDFs or photos</span><input accept=".pdf,image/*" multiple onChange={(event) => addAttachments(event.target.files)} type="file" /></label><div className="attachment-editor">{form.attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}<span>{attachment.name}</span><em>{formatFileSize(attachment.size)}{attachment.isPendingUpload ? " pending" : ""}</em><button aria-label={`Remove ${attachment.name}`} type="button" onClick={() => removeAttachment(attachment.id)} title="Remove"><X size={16} /></button></div>)}</div></section>
@@ -1614,8 +1618,10 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
   const selectedShareReview = shareableReviews.find((review) => review.id === selectedShareReviewId);
   const invitesReady = Boolean(healthStatus?.features?.managerInvites);
   const consumptionStorageReady = Boolean(healthStatus?.features?.consumptionStorage);
+  const guestCountStorageReady = Boolean(healthStatus?.features?.guestCountStorage);
   const inviteMetric = remoteMode ? (invitesReady ? "Ready" : "Setup") : "Local";
   const consumptionMetric = remoteMode ? (!healthStatus ? "Checking" : consumptionStorageReady ? "Ready" : "Setup") : "Local";
+  const guestCountMetric = remoteMode ? (!healthStatus ? "Checking" : guestCountStorageReady ? "Ready" : "Setup") : "Local";
   const sharingNote = remoteMode
     ? "Managers create and edit. Executives and directors view all reviews in read-only mode. Shared links expose one review, the executive brief, or a filtered report and can be revoked."
     : "Local mode is ready for personal tracking. Use PDF or CSV for outside sharing until Supabase and Vercel are connected.";
@@ -1689,8 +1695,9 @@ function SharingView({ accessUsers, healthStatus, lastShareUrl, links, reviews, 
   }
   return (
     <div className="view-grid">
-      <section className="metric-grid"><MetricCard icon={<ShieldCheck />} label="Active links" value={activeLinks.length} /><MetricCard icon={<Eye />} label="Role access" value="Read-only" /><MetricCard icon={<Mail />} label="Manager invites" value={inviteMetric} /><MetricCard icon={<Utensils />} label="Consumption" value={consumptionMetric} /><MetricCard icon={<Lock />} label="Storage" value={remoteMode || supabaseStatus.configured ? "Cloud" : "Local"} /></section>
+      <section className="metric-grid"><MetricCard icon={<ShieldCheck />} label="Active links" value={activeLinks.length} /><MetricCard icon={<Eye />} label="Role access" value="Read-only" /><MetricCard icon={<Mail />} label="Manager invites" value={inviteMetric} /><MetricCard icon={<Users />} label="Guest count" value={guestCountMetric} /><MetricCard icon={<Utensils />} label="Consumption" value={consumptionMetric} /><MetricCard icon={<Lock />} label="Storage" value={remoteMode || supabaseStatus.configured ? "Cloud" : "Local"} /></section>
       {role === "manager" && remoteMode && healthStatus && !consumptionStorageReady && <section className="content-band"><div className="access-status"><AlertTriangle size={18} /><div><strong>Consumption storage needs setup</strong><span>Run the Supabase consumption migration before relying on saved consumption choices or counts.</span></div></div></section>}
+      {role === "manager" && remoteMode && healthStatus && !guestCountStorageReady && <section className="content-band"><div className="access-status"><AlertTriangle size={18} /><div><strong>Guest count storage needs setup</strong><span>Run the Supabase guest count migration before relying on saved guest counts.</span></div></div></section>}
       <section className="content-band">
         <div className="section-heading"><h3>Review Links</h3><span>{visibleLinks.length} shown | {activeLinks.length} active</span></div>
         <div className="share-filter-bar">
@@ -1865,6 +1872,7 @@ function ReviewTable({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit 
           <tr>
             <th>Event</th>
             <th>Date</th>
+            <th>Guests</th>
             <th>Contact</th>
             <th>Venue</th>
             <th>Manager</th>
@@ -1881,6 +1889,7 @@ function ReviewTable({ onCreateShare = () => {}, onDuplicate = () => {}, onEdit 
             <tr key={review.id}>
               <td><button className="link-button" onClick={() => onSelect(review)} type="button">{review.clientName}</button></td>
               <td>{formatDate(review.eventDate)}</td>
+              <td>{formatGuestCount(review.guestCount)}</td>
               <td>{review.clientContact || "N/A"}</td>
               <td>{review.venue}</td>
               <td>{review.managerName}</td>
@@ -1909,6 +1918,7 @@ function MobileReviewList({ onCreateShare = () => {}, onDuplicate = () => {}, on
           </div>
           <div className="mobile-review-meta"><span>{formatDate(review.eventDate)}</span><span>{review.venue}</span><span>{review.managerName}</span></div>
           <div className="mobile-review-fields">
+            <span><strong>Guests</strong>{formatGuestCount(review.guestCount)}</span>
             <span><strong>Contact</strong>{review.clientContact || "N/A"}</span>
             <span><strong>Rating</strong>{ratingLabel(review.overallRating)}</span>
             <span><strong>Attachments</strong>{attachmentDisplay(review)}</span>
@@ -1989,9 +1999,30 @@ function ConsumptionDetail({ consumption }) {
 }
 
 function AttachmentList({ attachments }) {
+  const [expanded, setExpanded] = useState(false);
+  const [printExpanded, setPrintExpanded] = useState(false);
+  const isExpanded = expanded || printExpanded;
+
+  useEffect(() => {
+    function handleBeforePrint() {
+      setPrintExpanded(true);
+    }
+
+    function handleAfterPrint() {
+      setPrintExpanded(false);
+    }
+
+    window.addEventListener("beforeprint", handleBeforePrint);
+    window.addEventListener("afterprint", handleAfterPrint);
+    return () => {
+      window.removeEventListener("beforeprint", handleBeforePrint);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+  }, []);
+
   return (
-    <div>
-      <div className="section-heading"><h3>Attachments</h3><span>{attachments.length}</span></div>
+    <div className={`attachments-panel ${isExpanded ? "is-expanded" : ""}`}>
+      <button aria-expanded={isExpanded} className="attachment-toggle" onClick={() => setExpanded((current) => !current)} type="button"><span>Attachments</span><em>{attachments.length}</em><ChevronRight className="attachment-toggle-icon" size={16} /></button>
       <div className="attachment-list">
         {attachments.length === 0 && <p className="small-muted">No attachments.</p>}
         {attachments.map((attachment) => <div className="attachment-row" key={attachment.id}>{attachment.type.includes("pdf") ? <FileText size={18} /> : <ImageIcon size={18} />}{attachment.downloadUrl ? <a href={attachment.downloadUrl} rel="noreferrer" target="_blank">{attachment.name}</a> : <span>{attachment.name}</span>}<em>{formatFileSize(attachment.size)}</em><small>{formatDateTime(attachment.uploadedAt)}</small></div>)}
@@ -2029,8 +2060,8 @@ function DateFilter({ label, value, onChange }) {
   return <label className="date-box"><CalendarDays size={16} /><span>{label}</span><input onChange={(event) => onChange(event.target.value)} type="date" value={value} /></label>;
 }
 
-function TextInput({ disabled = false, label, onChange, required, type = "text", value }) {
-  return <label className="field"><span>{label}</span><input disabled={disabled} onChange={(event) => onChange(event.target.value)} required={required} type={type} value={value} /></label>;
+function TextInput({ disabled = false, label, min, onChange, required, type = "text", value }) {
+  return <label className="field"><span>{label}</span><input disabled={disabled} min={min} onChange={(event) => onChange(event.target.value)} required={required} type={type} value={value} /></label>;
 }
 
 function SelectInput({ disabled = false, label, onChange, options, renderOption, required = false, value }) {

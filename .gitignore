@@ -3,6 +3,7 @@ node_modules
 out
 .vercel
 .tools
+supabase/.temp/
 .env*.local
 *.log
 verification-*.png

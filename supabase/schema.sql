@@ -32,6 +32,7 @@ create table if not exists event_reviews (
   event_name text not null,
   client_contact text,
   event_date date not null,
+  guest_count integer check (guest_count is null or guest_count >= 0),
   venue text not null,
   event_type text not null,
   manager_name text not null,
@@ -59,6 +60,7 @@ alter table event_reviews add column if not exists follow_up_due_date date;
 alter table event_reviews add column if not exists client_contact text;
 alter table event_reviews add column if not exists follow_up_notes text;
 alter table event_reviews add column if not exists consumption jsonb not null default '{}'::jsonb;
+alter table event_reviews add column if not exists guest_count integer check (guest_count is null or guest_count >= 0);
 
 create table if not exists review_attachments (
   id uuid primary key default gen_random_uuid(),
